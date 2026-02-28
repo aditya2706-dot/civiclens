@@ -106,10 +106,16 @@ export default function Settings() {
                                 <p className="text-white/80 text-sm truncate px-1">{user ? user.email : 'Login to sync data'}</p>
                             </div>
                         </div>
-                        {user && (
+                        {user ? (
                             <button onClick={() => setIsEditing(true)} className="bg-white/20 hover:bg-white text-white hover:text-green-700 backdrop-blur text-xs font-bold px-4 py-2 rounded-full transition-colors ml-2 shrink-0">
                                 Edit
                             </button>
+                        ) : (
+                            <Link href="/login">
+                                <button className="bg-white/20 hover:bg-white text-white hover:text-green-700 backdrop-blur text-xs font-bold px-4 py-2 rounded-full transition-colors ml-2 shrink-0">
+                                    Log In
+                                </button>
+                            </Link>
                         )}
                     </div>
                 ) : (
@@ -184,12 +190,19 @@ export default function Settings() {
                 </div>
 
                 <div className="pt-4">
-                    <Link href="/login">
-                        <button className="w-full flex items-center justify-center gap-2 bg-white text-red-500 border border-red-100 font-bold py-4 rounded-2xl hover:bg-red-50 transition-colors">
+                    {user ? (
+                        <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 bg-white text-red-500 border border-red-100 font-bold py-4 rounded-2xl hover:bg-red-50 transition-colors">
                             <LogOut size={18} />
                             Sign Out
                         </button>
-                    </Link>
+                    ) : (
+                        <Link href="/login" className="block w-full">
+                            <button className="w-full flex items-center justify-center gap-2 bg-green-600 text-white font-bold py-4 rounded-2xl hover:bg-green-700 transition-colors">
+                                <User size={18} />
+                                Log In to your Account
+                            </button>
+                        </Link>
+                    )}
                 </div>
             </div>
         </main>

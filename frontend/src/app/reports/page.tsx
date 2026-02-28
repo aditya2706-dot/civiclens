@@ -15,8 +15,8 @@ export default function MyReports() {
         const fetchReports = async () => {
             try {
                 const res = await axios.get("http://localhost:5001/api/reports");
-                if (res.data.success) {
-                    setReports(res.data.data);
+                if (Array.isArray(res.data)) {
+                    setReports(res.data);
                 }
             } catch (err) {
                 console.error("Failed to fetch reports:", err);

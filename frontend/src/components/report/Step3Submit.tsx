@@ -27,7 +27,7 @@ export function Step3Submit({
             }
 
             const payload = {
-                imageUrl: data.image,
+                imageUrl: data.base64Image || data.imageUrl,
                 category: data.aiAnalysis?.suggestedCategory || 'Other',
                 aiSummary: data.aiAnalysis?.summary || '',
                 detectedObjects: data.aiAnalysis?.detectedObjects || [],

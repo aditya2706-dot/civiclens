@@ -19,7 +19,7 @@ export function Step2Analysis({
 
     useEffect(() => {
         const analyzeImage = async () => {
-            if (!data.file) {
+            if (!data.imageUrl) {
                 // If they bypassed the camera via debug/mock, just show mock
                 setTimeout(() => {
                     updateData({
@@ -37,14 +37,19 @@ export function Step2Analysis({
             }
 
             try {
-                // Determine mime type and base64
-                const reader = new FileReader();
-                reader.readAsDataURL(data.file);
-                reader.onloadend = async () => {
-                    const base64data = reader.result as string;
-                    // strip the "data:image/jpeg;base64," part
-                    const base64DataOnly = base64data.split(',')[1];
-                    const mimeType = data.file.type;
+                let fileBlob = data.file;
+
+                // If the user uploaded a photo but the File object didn't survive state transition,
+                // fetch it back from the blob URL.
+                if (!fileBlob && data.imageUrl.startsWith("blob:")) {
+                    const response = await fetch(data.imageUrl);
+                    fileBlob = await response.blob();
+                }
+
+                if (!fileBlob && data.imageUrl.startsWith("data:image")) {
+                    // It's already a base64 string
+                    const base64DataOnly = data.imageUrl.split(',')[1];
+                    const mimeType = data.imageUrl.split(';')[0].split(':')[1];
 
                     const response = await axios.post("http://localhost:5001/api/reports/analyze", {
                         imageBase64: base64DataOnly,
@@ -53,6 +58,36 @@ export function Step2Analysis({
 
                     updateData({
                         ...data,
+                        base64Image: data.imageUrl,
+                        aiAnalysis: {
+                            summary: response.data.summary,
+                            detectedObjects: response.data.detectedObjects,
+                            suggestedCategory: response.data.suggestedCategory,
+                            computedSeverity: response.data.estimatedSeverity,
+                            department: response.data.department
+                        }
+                    });
+                    setAnalyzing(false);
+                    return;
+                }
+
+                // Determine mime type and base64
+                const reader = new FileReader();
+                reader.readAsDataURL(fileBlob);
+                reader.onloadend = async () => {
+                    const base64data = reader.result as string;
+                    // strip the "data:image/jpeg;base64," part
+                    const base64DataOnly = base64data.split(',')[1];
+                    const mimeType = fileBlob.type || 'image/jpeg';
+
+                    const response = await axios.post("http://localhost:5001/api/reports/analyze", {
+                        imageBase64: base64DataOnly,
+                        mimeType: mimeType
+                    });
+
+                    updateData({
+                        ...data,
+                        base64Image: base64data,
                         aiAnalysis: {
                             summary: response.data.summary,
                             detectedObjects: response.data.detectedObjects,

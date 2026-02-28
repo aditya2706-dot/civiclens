@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // Fix for default Leaflet icon paths in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -17,22 +18,47 @@ L.Icon.Default.mergeOptions({
 
 import axios from "axios";
 
+function MapCenterUpdater({ center }: { center: [number, number] }) {
+    const map = useMap();
+    useEffect(() => {
+        if (center) {
+            map.flyTo(center, 14, { animate: true, duration: 1.5 });
+        }
+    }, [center, map]);
+    return null;
+}
+
 export default function MapComponent({ selectedCategory }: { selectedCategory: string }) {
     const [reports, setReports] = useState<any[]>([]);
     const [selectedReport, setSelectedReport] = useState<any>(null);
+    const [mapCenter, setMapCenter] = useState<[number, number]>([28.6139, 77.2090]); // Default to New Delhi
+    const router = useRouter();
 
     useEffect(() => {
         const fetchReports = async () => {
             try {
                 const res = await axios.get("http://localhost:5001/api/reports");
-                if (res.data.success) {
-                    setReports(res.data.data);
+                if (Array.isArray(res.data)) {
+                    setReports(res.data);
                 }
             } catch (err) {
                 console.error("Failed to fetch reports:", err);
             }
         };
         fetchReports();
+
+        // Get user location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setMapCenter([position.coords.latitude, position.coords.longitude]);
+                },
+                (error) => {
+                    console.error("Error getting location", error);
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+        }
     }, []);
 
     const getStatusColor = (status: string) => {
@@ -68,11 +94,13 @@ export default function MapComponent({ selectedCategory }: { selectedCategory: s
     return (
         <div className="absolute inset-0 z-0">
             <MapContainer
-                center={[28.6139, 77.2090]}
+                center={mapCenter}
                 zoom={14}
                 style={{ height: "100%", width: "100%", zIndex: 0 }}
                 zoomControl={false}
             >
+                <MapCenterUpdater center={mapCenter} />
+
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -103,9 +131,9 @@ export default function MapComponent({ selectedCategory }: { selectedCategory: s
                                 <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full ${getStatusColor(selectedReport.status)}`}>
                                     {selectedReport.status}
                                 </span>
-                                <h3 className="font-bold text-gray-900 mt-2">{selectedReport.title}</h3>
+                                <h3 className="font-bold text-gray-900 mt-2 line-clamp-2">{selectedReport.aiSummary || `${selectedReport.category} Issue`}</h3>
                                 <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                                    <MapPin size={14} /> Near Connaught Place
+                                    <MapPin size={14} /> Lat: {selectedReport.location?.lat?.toFixed(4)}, Lng: {selectedReport.location?.lng?.toFixed(4)}
                                 </p>
                             </div>
                             <button
@@ -115,7 +143,10 @@ export default function MapComponent({ selectedCategory }: { selectedCategory: s
                                 ✕
                             </button>
                         </div>
-                        <button className="w-full mt-4 bg-green-50 text-green-700 font-semibold py-3 rounded-xl hover:bg-green-100 transition-colors">
+                        <button
+                            onClick={() => router.push(`/reports/${selectedReport._id}`)}
+                            className="w-full mt-4 bg-green-50 text-green-700 font-semibold py-3 rounded-xl hover:bg-green-100 transition-colors"
+                        >
                             View Details
                         </button>
                     </motion.div>
