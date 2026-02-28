@@ -64,8 +64,20 @@ export function Step1Capture({
             },
             (error) => {
                 setIsLocating(false);
-                setLocationError("Failed to get location. Please ensure permissions are granted.");
+                setLocationError("Failed to get location. Using default location for testing.");
                 console.error("Error getting location:", error);
+
+                // Provide a default fallback location (New Delhi) so testing isn't blocked
+                updateData({
+                    ...data,
+                    imageUrl: capturedImageUrl,
+                    location: {
+                        lat: 28.6139,
+                        lng: 77.2090
+                    }
+                });
+                // Short delay so user sees location fallback message before moving to next step
+                setTimeout(onNext, 1500);
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );

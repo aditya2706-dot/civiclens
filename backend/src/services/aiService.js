@@ -57,8 +57,8 @@ const analyzeImageGemini = async (imageBase64, mimeType) => {
         };
 
     } catch (error) {
-        console.error("Gemini API Error:", error);
-        throw new Error("Failed to analyze image with AI");
+        console.error("Gemini API Error details:", error.response || error);
+        throw new Error(error.message || "Failed to analyze image with AI");
     }
 };
 

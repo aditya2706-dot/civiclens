@@ -71,36 +71,40 @@ export function Step2Analysis({
                     return;
                 }
 
-                // Determine mime type and base64
-                const reader = new FileReader();
-                reader.readAsDataURL(fileBlob);
-                reader.onloadend = async () => {
-                    const base64data = reader.result as string;
-                    // strip the "data:image/jpeg;base64," part
-                    const base64DataOnly = base64data.split(',')[1];
-                    const mimeType = fileBlob.type || 'image/jpeg';
+                // Read image as base64 using a Promise
+                const readAsDataURL = (blob: Blob) => new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
 
-                    const response = await axios.post("http://localhost:5001/api/reports/analyze", {
-                        imageBase64: base64DataOnly,
-                        mimeType: mimeType
-                    });
+                const base64data = await readAsDataURL(fileBlob);
+                const base64DataOnly = base64data.split(',')[1];
+                const mimeType = fileBlob.type || 'image/jpeg';
 
-                    updateData({
-                        ...data,
-                        base64Image: base64data,
-                        aiAnalysis: {
-                            summary: response.data.summary,
-                            detectedObjects: response.data.detectedObjects,
-                            suggestedCategory: response.data.suggestedCategory,
-                            computedSeverity: response.data.estimatedSeverity,
-                            department: response.data.department
-                        }
-                    });
-                    setAnalyzing(false);
-                };
-            } catch (err) {
-                console.error("Analysis error:", err);
-                setError("Failed to analyze image. Please try again or adjust details manually.");
+                const response = await axios.post("http://localhost:5001/api/reports/analyze", {
+                    imageBase64: base64DataOnly,
+                    mimeType: mimeType
+                });
+
+                updateData({
+                    ...data,
+                    base64Image: base64data,
+                    aiAnalysis: {
+                        summary: response.data.summary,
+                        detectedObjects: response.data.detectedObjects,
+                        suggestedCategory: response.data.suggestedCategory,
+                        computedSeverity: response.data.estimatedSeverity,
+                        department: response.data.department
+                    }
+                });
+                setAnalyzing(false);
+
+            } catch (err: any) {
+                console.error("Analysis error:", err.response?.data || err);
+                const apiError = err.response?.data?.error || err.response?.data?.message || err.message;
+                setError(`Failed to analyze image: ${apiError}. Please go back and try again.`);
                 setAnalyzing(false);
             }
         };
