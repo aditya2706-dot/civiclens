@@ -8,7 +8,13 @@ const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || ['http://localhost:3000', 'http://localhost:5173'],
+    origin: function (origin, callback) {
+        if (!origin || origin.includes('vercel.app') || origin.includes('localhost') || origin === process.env.FRONTEND_URL) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
 }));
 app.use(express.json({ limit: '50mb' }));
