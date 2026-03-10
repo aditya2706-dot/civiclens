@@ -27,8 +27,9 @@ const reportSchema = new mongoose.Schema({
         default: 'Medium',
     },
     location: {
-        lat: { type: Number, required: true },
-        lng: { type: Number, required: true }
+        lat: { type: Number },
+        lng: { type: Number },
+        address: { type: String }
     },
     status: {
         type: String,
@@ -41,6 +42,9 @@ const reportSchema = new mongoose.Schema({
     },
     department: {
         type: String,
+    },
+    ward: {
+        type: String, // E.g., "Ward 1", "North Zone"
     }
 }, { timestamps: true });
 

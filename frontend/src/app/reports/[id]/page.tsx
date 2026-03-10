@@ -16,7 +16,7 @@ export default function ReportDetails() {
     useEffect(() => {
         const fetchReport = async () => {
             try {
-                const res = await axios.get(`http://localhost:5001/api/reports/${id}`);
+                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}`);
                 if (res.data && res.data._id) {
                     setReport(res.data);
                 }
@@ -31,9 +31,13 @@ export default function ReportDetails() {
 
     const handleVerify = async (vote: "yes" | "no") => {
         try {
-            await axios.post(`http://localhost:5001/api/reports/${id}/verify`);
+            const isAccurate = vote === "yes";
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/verify`, { isAccurate });
             setVoted(vote);
-            setReport((prev: any) => ({ ...prev, verificationCount: (prev.verificationCount || 0) + 1 }));
+            setReport((prev: any) => ({
+                ...prev,
+                verificationCount: isAccurate ? (prev.verificationCount || 0) + 1 : Math.max(0, (prev.verificationCount || 0) - 1)
+            }));
         } catch (err) {
             console.error("Failed to verify", err);
         }
@@ -78,6 +82,11 @@ export default function ReportDetails() {
                         <span className="bg-white/20 backdrop-blur text-white text-xs font-bold px-3 py-1 rounded-full mb-2 inline-block">
                             {report.category}
                         </span>
+                        {report.ward && (
+                            <span className="bg-white/20 backdrop-blur text-white text-xs font-bold px-3 py-1 rounded-full mb-2 inline-block ml-2">
+                                {report.ward}
+                            </span>
+                        )}
                         <h1 className="text-2xl font-bold text-white leading-tight">{report.aiSummary || "Civic Issue"}</h1>
                     </div>
                     <span className={`text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap shadow-lg ${getStatusBadge(report.status)}`}>
@@ -91,7 +100,9 @@ export default function ReportDetails() {
                 <div className="flex justify-between items-center pb-6 border-b border-gray-200">
                     <div className="flex items-center gap-2 text-sm text-gray-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                         <MapPin size={16} className="text-gray-400 shrink-0" />
-                        <span className="truncate">Lat: {report.location?.lat?.toFixed(4)}, Lng: {report.location?.lng?.toFixed(4)}</span>
+                        <span className="truncate">
+                            {report.location?.address || `Lat: ${report.location?.lat?.toFixed(4)}, Lng: ${report.location?.lng?.toFixed(4)}`}
+                        </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600 font-medium shrink-0">
                         <Calendar size={16} className="text-gray-400" />

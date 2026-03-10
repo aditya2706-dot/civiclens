@@ -21,11 +21,9 @@ export default function Register() {
         setError("");
 
         try {
-            const res = await axios.post("http://localhost:5001/api/auth/register", {
-                name,
-                email,
-                password
-            });
+            const payload = { name, email, password };
+
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, payload);
 
             if (res.data && res.data.token) {
                 localStorage.setItem("token", res.data.token);
@@ -124,6 +122,6 @@ export default function Register() {
                     </Link>
                 </p>
             </motion.div>
-        </main>
+        </main >
     );
 }

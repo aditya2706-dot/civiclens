@@ -22,7 +22,7 @@ export default function Settings() {
             const token = localStorage.getItem('token');
             if (token) {
                 try {
-                    const res = await axios.get("http://localhost:5001/api/auth/profile", {
+                    const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     setUser(res.data);
@@ -43,7 +43,7 @@ export default function Settings() {
             const payload: any = { name: editName, email: editEmail };
             if (editPassword) payload.password = editPassword;
 
-            const res = await axios.put("http://localhost:5001/api/auth/profile", payload, {
+            const res = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUser(res.data);

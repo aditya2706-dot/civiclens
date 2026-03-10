@@ -13,6 +13,9 @@ export function Step3Submit({
     const [isAnonymous, setIsAnonymous] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isEditingLocation, setIsEditingLocation] = useState(false);
+    const [manualAddress, setManualAddress] = useState("");
+    const [selectedWard, setSelectedWard] = useState(data.aiAnalysis?.suggestedWard || "");
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
@@ -32,11 +35,12 @@ export function Step3Submit({
                 aiSummary: data.aiAnalysis?.summary || '',
                 detectedObjects: data.aiAnalysis?.detectedObjects || [],
                 severity: data.aiAnalysis?.computedSeverity || 'Medium',
-                location: data.location || { lat: 0, lng: 0 },
+                location: manualAddress ? { address: manualAddress } : (data.location || { lat: 0, lng: 0 }),
+                ward: selectedWard,
                 isAnonymous: isAnonymous
             };
 
-            const res = await axios.post("http://localhost:5001/api/reports", payload, { headers });
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports`, payload, { headers });
 
             if (res.data) {
                 setSubmitted(true);
@@ -109,11 +113,42 @@ export function Step3Submit({
                     </div>
                     <div className="flex justify-between items-start">
                         <span className="text-sm text-gray-500">Location</span>
-                        <span className="text-sm font-medium text-gray-800 text-right">Detected automatically<br /><span className="text-xs text-gray-400">({data.location?.lat}, {data.location?.lng})</span></span>
+                        {isEditingLocation ? (
+                            <div className="flex flex-col gap-2 items-end">
+                                <input
+                                    type="text"
+                                    className="border rounded p-1 text-sm text-right"
+                                    placeholder="Enter manual address"
+                                    value={manualAddress}
+                                    onChange={(e) => setManualAddress(e.target.value)}
+                                    autoFocus
+                                />
+                                <button className="text-xs text-green-600 underline" onClick={() => setIsEditingLocation(false)}>Save</button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-end">
+                                <span className="text-sm font-medium text-gray-800 text-right">
+                                    {manualAddress ? manualAddress : "Detected automatically"}
+                                    {!manualAddress && <br />}
+                                    {!manualAddress && <span className="text-xs text-gray-400">({data.location?.lat}, {data.location?.lng})</span>}
+                                </span>
+                                <button className="text-xs text-green-600 underline mt-1" onClick={() => setIsEditingLocation(true)}>Edit Address</button>
+                            </div>
+                        )}
                     </div>
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start pt-2">
                         <span className="text-sm text-gray-500">Severity</span>
                         <span className="text-sm font-bold text-red-600">{data.aiAnalysis?.computedSeverity}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-50 mt-2">
+                        <span className="text-sm text-gray-500">Nagar Nigam Ward</span>
+                        <input
+                            type="text"
+                            value={selectedWard}
+                            placeholder="e.g. Ward 42"
+                            onChange={(e) => setSelectedWard(e.target.value)}
+                            className="text-sm border border-gray-200 rounded-lg bg-white p-2 text-right font-medium text-gray-700 outline-none focus:border-green-500 w-48"
+                        />
                     </div>
                 </div>
 

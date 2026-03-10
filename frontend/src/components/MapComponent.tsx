@@ -28,7 +28,7 @@ function MapCenterUpdater({ center }: { center: [number, number] }) {
     return null;
 }
 
-export default function MapComponent({ selectedCategory }: { selectedCategory: string }) {
+export default function MapComponent({ selectedCategory, selectedWard }: { selectedCategory: string, selectedWard: string }) {
     const [reports, setReports] = useState<any[]>([]);
     const [selectedReport, setSelectedReport] = useState<any>(null);
     const [mapCenter, setMapCenter] = useState<[number, number]>([28.6139, 77.2090]); // Default to New Delhi
@@ -37,7 +37,7 @@ export default function MapComponent({ selectedCategory }: { selectedCategory: s
     useEffect(() => {
         const fetchReports = async () => {
             try {
-                const res = await axios.get("http://localhost:5001/api/reports");
+                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports`);
                 if (Array.isArray(res.data)) {
                     setReports(res.data);
                 }
@@ -54,9 +54,9 @@ export default function MapComponent({ selectedCategory }: { selectedCategory: s
                     setMapCenter([position.coords.latitude, position.coords.longitude]);
                 },
                 (error) => {
-                    console.error("Error getting location", error);
+                    console.warn("Could not get exact location, using default.", error.message);
                 },
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
     }, []);
@@ -89,7 +89,10 @@ export default function MapComponent({ selectedCategory }: { selectedCategory: s
         });
     };
 
-    const filteredReports = reports.filter((r: any) => selectedCategory === "All" || r.category === selectedCategory);
+    const filteredReports = reports.filter((r: any) =>
+        (selectedCategory === "All" || r.category === selectedCategory) &&
+        (selectedWard === "All Wards" || r.ward === selectedWard || (!r.ward && selectedWard === "All Wards"))
+    );
 
     return (
         <div className="absolute inset-0 z-0">
@@ -107,14 +110,16 @@ export default function MapComponent({ selectedCategory }: { selectedCategory: s
                 />
 
                 {filteredReports.map((report: any) => (
-                    <Marker
-                        key={report._id}
-                        position={[report.location.lat, report.location.lng]}
-                        icon={getMarkerIcon(report.status)}
-                        eventHandlers={{
-                            click: () => setSelectedReport(report),
-                        }}
-                    />
+                    report.location?.lat !== undefined && report.location?.lng !== undefined ? (
+                        <Marker
+                            key={report._id}
+                            position={[report.location.lat, report.location.lng]}
+                            icon={getMarkerIcon(report.status)}
+                            eventHandlers={{
+                                click: () => setSelectedReport(report),
+                            }}
+                        />
+                    ) : null
                 ))}
             </MapContainer>
 
@@ -133,7 +138,7 @@ export default function MapComponent({ selectedCategory }: { selectedCategory: s
                                 </span>
                                 <h3 className="font-bold text-gray-900 mt-2 line-clamp-2">{selectedReport.aiSummary || `${selectedReport.category} Issue`}</h3>
                                 <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                                    <MapPin size={14} /> Lat: {selectedReport.location?.lat?.toFixed(4)}, Lng: {selectedReport.location?.lng?.toFixed(4)}
+                                    <MapPin size={14} /> {selectedReport.location?.address || `Lat: ${selectedReport.location?.lat?.toFixed(4)}, Lng: ${selectedReport.location?.lng?.toFixed(4)}`}
                                 </p>
                             </div>
                             <button

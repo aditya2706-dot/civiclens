@@ -1,18 +1,35 @@
 const Report = require('../models/Report');
 const { analyzeImageGemini, getDepartmentForCategory } = require('../services/aiService');
+const axios = require('axios');
 
 // @desc    Analyze uploaded image with Gemini
 // @route   POST /api/reports/analyze
 // @access  Public
 const analyzeImage = async (req, res) => {
     try {
-        const { imageBase64, mimeType } = req.body;
+        const { imageBase64, mimeType, location } = req.body;
 
         if (!imageBase64) {
             return res.status(400).json({ message: 'Missing imageBase64 data' });
         }
 
-        const aiAnalysis = await analyzeImageGemini(imageBase64, mimeType || 'image/jpeg');
+        let addressContext = '';
+        if (location && location.lat && location.lng) {
+            try {
+                // Fetch reverse geocoding from OpenStreetMap Nominatim
+                // Requires a User-Agent, so we use a dummy one
+                const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}`, {
+                    headers: { 'User-Agent': 'CivicLensApp/1.0' }
+                });
+                if (geoRes.data && geoRes.data.display_name) {
+                    addressContext = geoRes.data.display_name;
+                }
+            } catch (err) {
+                console.error("Geocoding error:", err.message);
+            }
+        }
+
+        const aiAnalysis = await analyzeImageGemini(imageBase64, mimeType || 'image/jpeg', addressContext);
         res.json(aiAnalysis);
 
     } catch (error) {
@@ -25,7 +42,7 @@ const analyzeImage = async (req, res) => {
 // @access  Public (can be anonymous or authenticated)
 const submitReport = async (req, res) => {
     try {
-        const { imageUrl, location, description, isAnonymous, category, aiSummary, detectedObjects, severity, department } = req.body;
+        const { imageUrl, location, description, isAnonymous, category, aiSummary, detectedObjects, severity, department, ward } = req.body;
 
         // Step 3: Create Report (already analyzed by frontend)
         const reportData = {
@@ -36,6 +53,7 @@ const submitReport = async (req, res) => {
             severity: severity,
             location,
             department: department,
+            ward: ward,
         };
 
         if (!isAnonymous && req.user) {
@@ -67,6 +85,30 @@ const getReports = async (req, res) => {
         res.status(500).json({ message: 'Error fetching reports', error: error.message });
     }
 };
+
+// @desc    Get reports assigned to the logged-in authority
+// @route   GET /api/reports/authority
+// @access  Private/Authority
+const getAuthorityReports = async (req, res) => {
+    try {
+        const { status } = req.query;
+        let query = {
+            department: req.user.department,
+        };
+
+        if (req.user.ward) {
+            query.ward = req.user.ward;
+        }
+
+        if (status) query.status = status;
+
+        const reports = await Report.find(query).sort({ createdAt: -1 });
+        res.json(reports);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching authority reports', error: error.message });
+    }
+};
+
 
 // @desc    Get a single report by ID
 // @route   GET /api/reports/:id
@@ -132,6 +174,7 @@ module.exports = {
     analyzeImage,
     submitReport,
     getReports,
+    getAuthorityReports,
     getReportById,
     updateReportStatus,
     verifyReport

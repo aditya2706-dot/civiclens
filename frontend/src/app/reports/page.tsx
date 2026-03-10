@@ -14,7 +14,7 @@ export default function MyReports() {
     useEffect(() => {
         const fetchReports = async () => {
             try {
-                const res = await axios.get("http://localhost:5001/api/reports");
+                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports`);
                 if (Array.isArray(res.data)) {
                     setReports(res.data);
                 }

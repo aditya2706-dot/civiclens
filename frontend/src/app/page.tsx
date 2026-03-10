@@ -10,6 +10,17 @@ import { motion } from "framer-motion";
 
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedWard, setSelectedWard] = useState("All Wards");
+
+  const WARDS = [
+    "All Wards",
+    "Ward 1 - Mall Road",
+    "Ward 2 - Civil Lines",
+    "Ward 3 - North Zone",
+    "Ward 4 - South Extension",
+    "Ward 5 - East Delhi",
+    "Ward 6 - West End"
+  ];
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-gray-50 relative pb-28">
@@ -26,17 +37,24 @@ export default function Home() {
         </button>
       </header>
 
-      {/* Floating Category Filter */}
-      <div className="absolute top-32 left-0 right-0 z-20">
+      {/* Floating Category and Ward Filter */}
+      <div className="absolute top-32 left-0 right-0 z-20 flex flex-col gap-2 px-4 shadow-sm items-center">
         <CategoryFilter
           selected={selectedCategory}
           onSelect={setSelectedCategory}
         />
+        <select
+          value={selectedWard}
+          onChange={(e) => setSelectedWard(e.target.value)}
+          className="text-xs border-2 border-green-500 rounded-full bg-white px-4 py-1.5 font-bold text-green-700 shadow-md ml-auto"
+        >
+          {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
+        </select>
       </div>
 
       {/* Map Area */}
       <div className="flex-1 w-full bg-gray-200 relative -mt-6">
-        <MapComponent selectedCategory={selectedCategory} />
+        <MapComponent selectedCategory={selectedCategory} selectedWard={selectedWard} />
 
         {/* Reports Near You Overlay Context */}
         <div className="absolute top-20 left-1/2 transform -translate-x-1/2 max-w-[80%] w-[300px] z-20 pointer-events-none">

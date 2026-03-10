@@ -8,8 +8,18 @@ const userSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        required: true,
         unique: true,
+        sparse: true,
+    },
+    username: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
+    phone: {
+        type: String,
+        unique: true,
+        sparse: true,
     },
     password: {
         type: String,
@@ -17,8 +27,14 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['user', 'admin'],
-        default: 'user',
+        enum: ['citizen', 'authority', 'admin'],
+        default: 'citizen',
+    },
+    department: {
+        type: String,
+    },
+    ward: {
+        type: String,
     },
 }, { timestamps: true });
 

@@ -51,10 +51,17 @@ export function Step2Analysis({
                     const base64DataOnly = data.imageUrl.split(',')[1];
                     const mimeType = data.imageUrl.split(';')[0].split(':')[1];
 
-                    const response = await axios.post("http://localhost:5001/api/reports/analyze", {
+                    const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/analyze`, {
                         imageBase64: base64DataOnly,
-                        mimeType: mimeType
+                        mimeType: mimeType,
+                        location: data.location
                     });
+
+                    if (response.data.isGenuine === false) {
+                        setError(`Fake Image Detected: ${response.data.fraudReason}`);
+                        setAnalyzing(false);
+                        return;
+                    }
 
                     updateData({
                         ...data,
@@ -64,7 +71,8 @@ export function Step2Analysis({
                             detectedObjects: response.data.detectedObjects,
                             suggestedCategory: response.data.suggestedCategory,
                             computedSeverity: response.data.estimatedSeverity,
-                            department: response.data.department
+                            department: response.data.department,
+                            suggestedWard: response.data.suggestedWard
                         }
                     });
                     setAnalyzing(false);
@@ -83,10 +91,17 @@ export function Step2Analysis({
                 const base64DataOnly = base64data.split(',')[1];
                 const mimeType = fileBlob.type || 'image/jpeg';
 
-                const response = await axios.post("http://localhost:5001/api/reports/analyze", {
+                const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/analyze`, {
                     imageBase64: base64DataOnly,
-                    mimeType: mimeType
+                    mimeType: mimeType,
+                    location: data.location
                 });
+
+                if (response.data.isGenuine === false) {
+                    setError(`Fake Image Detected: ${response.data.fraudReason}`);
+                    setAnalyzing(false);
+                    return;
+                }
 
                 updateData({
                     ...data,
@@ -96,7 +111,8 @@ export function Step2Analysis({
                         detectedObjects: response.data.detectedObjects,
                         suggestedCategory: response.data.suggestedCategory,
                         computedSeverity: response.data.estimatedSeverity,
-                        department: response.data.department
+                        department: response.data.department,
+                        suggestedWard: response.data.suggestedWard
                     }
                 });
                 setAnalyzing(false);

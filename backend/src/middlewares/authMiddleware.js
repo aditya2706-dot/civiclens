@@ -48,4 +48,20 @@ const admin = (req, res, next) => {
     }
 };
 
-module.exports = { protect, optionalAuth, admin };
+const authority = (req, res, next) => {
+    if (req.user && req.user.role === 'authority') {
+        next();
+    } else {
+        res.status(401).json({ message: 'Not authorized as an authority' });
+    }
+};
+
+const adminOrAuthority = (req, res, next) => {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'authority')) {
+        next();
+    } else {
+        res.status(401).json({ message: 'Not authorized for this action' });
+    }
+};
+
+module.exports = { protect, optionalAuth, admin, authority, adminOrAuthority };
