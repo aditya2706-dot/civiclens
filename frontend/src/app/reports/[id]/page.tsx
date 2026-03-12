@@ -231,8 +231,11 @@ export default function ReportDetails() {
                 {/* Ownership Check for Deletion */}
                 {(() => {
                     const localUser = localStorage.getItem('user');
-                    const userId = localUser ? JSON.parse(localUser)._id : null;
-                    const isOwner = userId && report.userId && (report.userId === userId || report.userId._id === userId);
+                    const currentUserId = localUser ? JSON.parse(localUser)._id : null;
+                    
+                    // The report.userId might be an object (if populated) or a string ID
+                    const reportOwnerId = report.userId?._id || report.userId;
+                    const isOwner = currentUserId && reportOwnerId && String(reportOwnerId) === String(currentUserId);
                     
                     if (isOwner) {
                         return (

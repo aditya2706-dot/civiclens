@@ -16,7 +16,7 @@ const reportSchema = new mongoose.Schema({
     category: {
         type: String,
         required: true,
-        enum: ['Litter', 'Open Dump', 'Pothole', 'Streetlight', 'Sewage', 'Other'],
+        enum: ['Litter', 'Open Dump', 'Pothole', 'Streetlight', 'Sewage', 'Infrastructure', 'Other'],
     },
     aiSummary: {
         type: String,
