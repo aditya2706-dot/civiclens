@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Search, Calendar } from "lucide-react";
-
 import axios from "axios";
+import FilterBar from "@/components/FilterBar";
+import Link from "next/link";
 
 export default function MyReports() {
     const [reports, setReports] = useState<any[]>([]);
     const [filter, setFilter] = useState("All");
-    const filters = ["All", "Pending", "Under Review", "Resolved"];
+    const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
         const fetchReports = async () => {
@@ -34,7 +35,13 @@ export default function MyReports() {
         }
     };
 
-    const filteredReports = reports.filter(r => filter === "All" || r.status === filter);
+    const filteredReports = reports.filter(r => {
+        const matchesStatus = filter === "All" || r.status === filter;
+        const matchesSearch = r.aiSummary?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              r.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              r.location?.address?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesStatus && matchesSearch;
+    });
 
     return (
         <main className="min-h-screen bg-gray-50 flex flex-col pt-8 px-6 pb-32">
@@ -43,68 +50,63 @@ export default function MyReports() {
                 <p className="text-gray-500 text-sm">Track your contributions to the city</p>
             </header>
 
-            {/* Filter Tabs */}
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-4">
-                {filters.map(f => (
-                    <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors ${filter === f
-                            ? "bg-gray-800 text-white shadow-sm"
-                            : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                            }`}
-                    >
-                        {f}
-                    </button>
-                ))}
+            {/* Filter Bar */}
+            <div className="-mx-6 mb-6">
+                <FilterBar 
+                    selectedStatus={filter}
+                    setSelectedStatus={setFilter}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                />
             </div>
 
             {/* Reports List */}
             <div className="space-y-4">
                 <AnimatePresence>
                     {filteredReports.map((report) => (
-                        <motion.div
-                            layout
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ duration: 0.2 }}
-                            key={report._id}
-                            className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 flex flex-col group cursor-pointer hover:shadow-md transition-shadow"
-                        >
-                            <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4">
-                                <img
-                                    src={report.imageUrl || "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80&w=600"}
-                                    alt={report.category}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                />
-                                <div className="absolute top-3 left-3">
-                                    <span className="bg-white/90 backdrop-blur text-gray-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-                                        {report.category}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="px-1">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-bold text-gray-800 line-clamp-1">{report.aiSummary || report.category + " Issue"}</h3>
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-md border whitespace-nowrap ml-2 ${getStatusColor(report.status)}`}>
-                                        {report.status}
-                                    </span>
-                                </div>
-
-                                <div className="flex items-center gap-4 text-xs text-gray-500 font-medium">
-                                    <div className="flex items-center gap-1">
-                                        <MapPin size={12} />
-                                        <span className="truncate max-w-[120px]">Lat: {report.location?.lat?.toFixed(4) || "0.0"}, Lng: {report.location?.lng?.toFixed(4) || "0.0"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Calendar size={12} />
-                                        <span>{report.createdAt ? new Date(report.createdAt).toLocaleDateString() : 'Recently'}</span>
+                        <Link href={`/reports/${report._id}`} key={report._id}>
+                            <motion.div
+                                layout
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ duration: 0.2 }}
+                                className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 flex flex-col group cursor-pointer hover:shadow-md transition-shadow"
+                            >
+                                <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4">
+                                    <img
+                                        src={report.imageUrl || "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80&w=600"}
+                                        alt={report.category}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                    />
+                                    <div className="absolute top-3 left-3">
+                                        <span className="bg-white/90 backdrop-blur text-gray-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm">
+                                            {report.category}
+                                        </span>
                                     </div>
                                 </div>
-                            </div>
-                        </motion.div>
+
+                                <div className="px-1">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="font-bold text-gray-800 line-clamp-1">{report.aiSummary || report.category + " Issue"}</h3>
+                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md border whitespace-nowrap ml-2 ${getStatusColor(report.status)}`}>
+                                            {report.status}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-4 text-xs text-gray-500 font-medium">
+                                        <div className="flex items-center gap-1">
+                                            <MapPin size={12} />
+                                            <span className="truncate max-w-[120px]">Lat: {report.location?.lat?.toFixed(4) || "0.0"}, Lng: {report.location?.lng?.toFixed(4) || "0.0"}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Calendar size={12} />
+                                            <span>{report.createdAt ? new Date(report.createdAt).toLocaleDateString() : 'Recently'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </Link>
                     ))}
                 </AnimatePresence>
 

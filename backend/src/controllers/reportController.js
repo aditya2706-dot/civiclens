@@ -1,5 +1,7 @@
 const Report = require('../models/Report');
-const { analyzeImageGemini, getDepartmentForCategory } = require('../services/aiService');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
+const { analyzeImageGemini, getDepartmentForCategory, translateText } = require('../services/aiService');
 const axios = require('axios');
 
 // @desc    Analyze uploaded image with Gemini
@@ -58,9 +60,27 @@ const submitReport = async (req, res) => {
 
         if (!isAnonymous && req.user) {
             reportData.userId = req.user._id;
+            // Award 10 points for creating a report
+            await User.findByIdAndUpdate(req.user._id, { $inc: { civicPoints: 10 } });
         }
 
         const report = await Report.create(reportData);
+
+        // Feature: Push Notifications for High Severity
+        if (severity === 'High' && department) {
+            const authorities = await User.find({ role: 'authority', department: department });
+            const notifications = authorities.map(auth => ({
+                userId: auth._id,
+                reportId: report._id,
+                title: 'High Severity Alert 🚨',
+                message: `A critical ${category} issue was just reported in your department.`,
+                type: 'NEW_REPORT'
+            }));
+            if (notifications.length > 0) {
+                await Notification.insertMany(notifications);
+            }
+        }
+
         res.status(201).json(report);
 
     } catch (error) {
@@ -115,7 +135,9 @@ const getAuthorityReports = async (req, res) => {
 // @access  Public
 const getReportById = async (req, res) => {
     try {
-        const report = await Report.findById(req.params.id).populate('userId', 'name');
+        const report = await Report.findById(req.params.id)
+            .populate('userId', 'name')
+            .populate('comments.user', 'name role department');
         if (report) {
             res.json(report);
         } else {
@@ -131,11 +153,30 @@ const getReportById = async (req, res) => {
 // @access  Private/Admin
 const updateReportStatus = async (req, res) => {
     try {
-        const { status } = req.body;
+        const { status, resolutionImageUrl } = req.body;
         const report = await Report.findById(req.params.id);
 
         if (report) {
+            // Check if status is transitioning to Resolved
+            if (status === 'Resolved' && report.status !== 'Resolved' && report.userId) {
+                // Award 50 points to the citizen who reported it
+                await User.findByIdAndUpdate(report.userId, { $inc: { civicPoints: 50 } });
+
+                // Feature: Target Citizen Notification
+                await Notification.create({
+                    userId: report.userId,
+                    reportId: report._id,
+                    title: 'Issue Resolved! 🎉',
+                    message: `Thank you! The ${report.category} issue you reported has been officially resolved. You earned 50 Civic Points!`,
+                    type: 'STATUS_UPDATE'
+                });
+            }
+
             report.status = status;
+            if (resolutionImageUrl) {
+                report.resolutionImageUrl = resolutionImageUrl;
+            }
+            
             const updatedReport = await report.save();
             res.json(updatedReport);
         } else {
@@ -170,6 +211,69 @@ const verifyReport = async (req, res) => {
     }
 };
 
+// @desc    Toggle Upvote (Me Too) on a report
+// @route   POST /api/reports/:id/upvote
+// @access  Private
+const toggleUpvote = async (req, res) => {
+    try {
+        const report = await Report.findById(req.params.id);
+        
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        const userId = req.user._id;
+
+        // Check if user has already upvoted
+        const hasUpvoted = report.upvotedBy.includes(userId);
+
+        if (hasUpvoted) {
+            // Downvote (remove user)
+            report.upvotedBy = report.upvotedBy.filter(id => id.toString() !== userId.toString());
+            report.upvoteCount -= 1;
+        } else {
+            // Upvote (add user)
+            report.upvotedBy.push(userId);
+            report.upvoteCount += 1;
+        }
+
+        const updatedReport = await report.save();
+        res.json({ upvoteCount: updatedReport.upvoteCount, upvotedBy: updatedReport.upvotedBy });
+    } catch (error) {
+        res.status(500).json({ message: 'Error toggling upvote', error: error.message });
+    }
+};
+
+// @desc    Add a comment to a report
+// @route   POST /api/reports/:id/comments
+// @access  Private
+const addComment = async (req, res) => {
+    try {
+        const { text } = req.body;
+        const report = await Report.findById(req.params.id);
+
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        const newComment = {
+            user: req.user._id,
+            text,
+            isAuthority: req.user.role === 'authority' || req.user.role === 'admin'
+        };
+
+        report.comments.push(newComment);
+        await report.save();
+
+        // Optionally fetch the inserted comment with populated user details to return to frontend
+        const populatedReport = await Report.findById(req.params.id).populate('comments.user', 'name role department');
+        
+        res.status(201).json(populatedReport.comments);
+    } catch (error) {
+        res.status(500).json({ message: 'Error adding comment', error: error.message });
+    }
+};
+
 module.exports = {
     analyzeImage,
     submitReport,
@@ -177,5 +281,27 @@ module.exports = {
     getAuthorityReports,
     getReportById,
     updateReportStatus,
-    verifyReport
+    verifyReport,
+    toggleUpvote,
+    addComment,
+    translateReport
 };
+
+// @desc    Translate report text to Hindi using Gemini AI
+// @route   POST /api/reports/:id/translate
+// @access  Public
+async function translateReport(req, res) {
+    try {
+        const report = await Report.findById(req.params.id);
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        const textToTranslate = report.aiSummary || report.category;
+        const translated = await translateText(textToTranslate, 'Hindi');
+
+        res.json({ translated });
+    } catch (error) {
+        res.status(500).json({ message: 'Translation failed', error: error.message });
+    }
+}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { LogOut, MapPin, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 import { motion } from "framer-motion";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function AuthorityDashboard() {
     const router = useRouter();
@@ -50,17 +51,32 @@ export default function AuthorityDashboard() {
         fetchDashboardData();
     }, [router]);
 
-    const handleStatusUpdate = async (id: string, newStatus: string) => {
+    const handleStatusUpdate = async (id: string, newStatus: string, resolutionFile?: File) => {
         try {
             const token = localStorage.getItem("token");
-            await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/status`, { status: newStatus }, {
+            let resolutionImageUrl = undefined;
+
+            if (newStatus === "Resolved" && resolutionFile) {
+                // Upload to Cloudinary first
+                const cloudinaryData = new FormData();
+                cloudinaryData.append("file", resolutionFile);
+                cloudinaryData.append("upload_preset", "civic_issue"); // Using the existing preset from Report component
+                
+                const uploadRes = await axios.post("https://api.cloudinary.com/v1_1/dxzz1b23i/image/upload", cloudinaryData);
+                resolutionImageUrl = uploadRes.data.secure_url;
+            }
+
+            await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/status`, { 
+                status: newStatus,
+                resolutionImageUrl 
+            }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             // Update local state
-            setReports(reports.map(r => r._id === id ? { ...r, status: newStatus } : r));
+            setReports(reports.map(r => r._id === id ? { ...r, status: newStatus, resolutionImageUrl } : r));
         } catch (error) {
             console.error("Failed to update status", error);
-            alert("Error updating status");
+            alert("Error updating status. If resolving, ensure the photo is valid.");
         }
     };
 
@@ -82,9 +98,14 @@ export default function AuthorityDashboard() {
                         <h1 className="text-2xl font-bold">Authority Portal</h1>
                         <p className="text-gray-400 text-sm">Welcome back, {user?.name}</p>
                     </div>
-                    <button onClick={handleLogout} className="p-2 bg-gray-800 rounded-full text-red-400 hover:bg-gray-700">
-                        <LogOut size={20} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <div className="invert">
+                            <NotificationBell />
+                        </div>
+                        <button onClick={handleLogout} className="p-2 bg-gray-800 rounded-full text-red-400 hover:bg-gray-700">
+                            <LogOut size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Info Cards */}
@@ -141,17 +162,52 @@ export default function AuthorityDashboard() {
                                 </div>
 
                                 {/* Authority Action: Status Update */}
-                                <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-                                    <span className="text-xs font-semibold text-gray-400">Update Status:</span>
-                                    <select
-                                        value={report.status}
-                                        onChange={(e) => handleStatusUpdate(report._id, e.target.value)}
-                                        className="bg-gray-50 border border-gray-200 text-sm font-semibold rounded-lg px-3 py-2 text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
-                                    >
-                                        <option value="Pending">Pending</option>
-                                        <option value="In Progress">In Progress</option>
-                                        <option value="Resolved">Resolved</option>
-                                    </select>
+                                <div className="mt-auto pt-4 border-t border-gray-50 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-gray-400">Status:</span>
+                                        <select
+                                            value={report.status}
+                                            onChange={(e) => {
+                                                if (e.target.value !== "Resolved") {
+                                                    handleStatusUpdate(report._id, e.target.value);
+                                                }
+                                                // If "Resolved", we rely on the file input button below to trigger the update
+                                            }}
+                                            className="bg-gray-50 border border-gray-200 text-sm font-semibold rounded-lg px-3 py-2 text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
+                                        >
+                                            <option value="Pending">Pending</option>
+                                            <option value="In Progress">In Progress</option>
+                                            <option value="Resolved" disabled>Requires Photo Proof</option>
+                                        </select>
+                                    </div>
+                                    
+                                    {report.status !== "Resolved" && (
+                                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 border-dashed">
+                                            <span className="text-xs font-semibold text-gray-500 uppercase">Mark Resolved</span>
+                                            <label className="cursor-pointer bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
+                                                <CheckCircle size={14} /> Upload Proof
+                                                <input 
+                                                    type="file" 
+                                                    accept="image/*" 
+                                                    className="hidden" 
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            alert("Uploading photo and resolving issue...");
+                                                            await handleStatusUpdate(report._id, "Resolved", file);
+                                                        }
+                                                    }}
+                                                />
+                                            </label>
+                                        </div>
+                                    )}
+
+                                    {report.status === "Resolved" && report.resolutionImageUrl && (
+                                        <div className="mt-2 text-xs text-green-600 font-medium flex items-center justify-between border border-green-100 bg-green-50 px-3 py-2 rounded-lg">
+                                            <span className="flex items-center gap-1"><CheckCircle size={14} /> Verified Fixed</span>
+                                            <a href={report.resolutionImageUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold text-green-700">View Proof</a>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>

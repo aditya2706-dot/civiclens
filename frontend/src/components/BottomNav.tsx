@@ -2,20 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Map, FileText, BookOpen, Settings, Plus } from "lucide-react";
+import { Map, FileText, BookOpen, Settings, Plus, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function BottomNav() {
     const pathname = usePathname();
+    const { t } = useLanguage();
 
     const navItems = [
-        { label: "Map", href: "/", icon: Map },
-        { label: "Reports", href: "/reports", icon: FileText },
+        { labelKey: "navMap", href: "/", icon: Map },
+        { labelKey: "navReports", href: "/reports", icon: FileText },
     ];
 
     const navItemsRight = [
-        { label: "Blog", href: "/blog", icon: BookOpen },
-        { label: "Settings", href: "/settings", icon: Settings },
+        { labelKey: "navLeaderboard", href: "/leaderboard", icon: Trophy },
+        { labelKey: "navSettings", href: "/settings", icon: Settings },
     ];
 
     const Item = ({ item }: { item: any }) => {
@@ -30,7 +32,7 @@ export default function BottomNav() {
                     <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
                 </div>
                 <span className={`text-[10px] font-medium transition-colors ${isActive ? "text-green-600" : "text-gray-500"}`}>
-                    {item.label}
+                    {t(item.labelKey)}
                 </span>
                 {isActive && (
                     <motion.div
@@ -51,7 +53,7 @@ export default function BottomNav() {
                 {/* Left Items */}
                 <div className="flex w-2/5 justify-between">
                     {navItems.map((item) => (
-                        <Item key={item.label} item={item} />
+                        <Item key={item.labelKey} item={item} />
                     ))}
                 </div>
 
@@ -72,7 +74,7 @@ export default function BottomNav() {
                 {/* Right Items */}
                 <div className="flex w-2/5 justify-between">
                     {navItemsRight.map((item) => (
-                        <Item key={item.label} item={item} />
+                        <Item key={item.labelKey} item={item} />
                     ))}
                 </div>
             </div>

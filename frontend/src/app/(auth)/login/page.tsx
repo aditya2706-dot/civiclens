@@ -100,7 +100,7 @@ export default function Login() {
                     <div className="space-y-1">
                         <div className="flex justify-between items-center ml-1">
                             <label className="text-sm font-semibold text-gray-700">Password</label>
-                            <a href="#" className="text-xs font-semibold text-green-600 hover:text-green-700">Forgot?</a>
+                            <Link href="/forgot-password" className="text-xs font-semibold text-green-600 hover:text-green-700">Forgot?</Link>
                         </div>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">

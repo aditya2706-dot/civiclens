@@ -24,6 +24,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/reports', require('./src/routes/reportRoutes'));
 app.use('/api/blogs', require('./src/routes/blogRoutes'));
+app.use('/api/notifications', require('./src/routes/notificationRoutes'));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI)

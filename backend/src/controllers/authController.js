@@ -245,11 +245,88 @@ const verifyOtp = async (req, res) => {
     }
 };
 
+// @desc    Get top users by civic points
+// @route   GET /api/auth/leaderboard
+// @access  Public
+const getLeaderboard = async (req, res) => {
+    try {
+        const topUsers = await User.find({ role: 'citizen' })
+            .sort({ civicPoints: -1 })
+            .limit(10)
+            .select('name civicPoints createdAt'); // Only send necessary fields
+        res.json(topUsers);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching leaderboard', error: error.message });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
     getUserProfile,
     updateUserProfile,
     sendOtp,
-    verifyOtp
+    verifyOtp,
+    getLeaderboard,
+    forgotPassword,
+    resetPassword
 };
+
+// @desc    Forgot Password - Send OTP to email
+// @route   POST /api/auth/forgot-password
+// @access  Public
+async function forgotPassword(req, res) {
+    const { email } = req.body;
+    console.log(`[DEBUG] Forgot Password request received for: ${email}`);
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            console.log(`[DEBUG] User NOT found for email: ${email}`);
+            return res.status(404).json({ message: 'User with this email does not exist.' });
+        }
+        console.log(`[DEBUG] User found! Generating OTP...`);
+
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Remove old OTPs for this email
+        await Otp.deleteMany({ email });
+
+        await Otp.create({ email, otp: otpCode });
+
+        // Simulate Email sending by logging to console
+        console.log(`[EMAIL SIMULATION] Sending Password Reset OTP ${otpCode} to ${email}`);
+
+        res.json({ message: 'Password reset OTP sent to your email (check server console).' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+}
+
+// @desc    Reset Password using OTP
+// @route   POST /api/auth/reset-password
+// @access  Public
+async function resetPassword(req, res) {
+    const { email, otp, newPassword } = req.body;
+    try {
+        const validOtp = await Otp.findOne({ email, otp });
+        if (!validOtp) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Update password
+        user.password = newPassword; // Pre-save hook will hash it
+        await user.save();
+
+        // Clean up OTP
+        await Otp.deleteMany({ email });
+
+        res.json({ message: 'Password has been reset successfully. You can now login with your new password.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+}

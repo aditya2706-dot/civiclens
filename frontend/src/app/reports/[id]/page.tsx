@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Calendar, ThumbsUp, ThumbsDown, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, ThumbsUp, ThumbsDown, CheckCircle2, Send, MessageCircle, ShieldCheck, Share2, Link as LinkIcon, Twitter, Phone, Languages } from "lucide-react";
 import axios from "axios";
 
 export default function ReportDetails() {
@@ -12,6 +12,10 @@ export default function ReportDetails() {
     const [report, setReport] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [voted, setVoted] = useState<"yes" | "no" | null>(null);
+    const [newComment, setNewComment] = useState("");
+    const [submittingComment, setSubmittingComment] = useState(false);
+    const [translatedText, setTranslatedText] = useState<string | null>(null);
+    const [translating, setTranslating] = useState(false);
 
     useEffect(() => {
         const fetchReport = async () => {
@@ -59,6 +63,114 @@ export default function ReportDetails() {
     if (!report) {
         return <div className="min-h-screen bg-gray-50 flex items-center justify-center font-bold text-gray-500">Report not found</div>;
     }
+
+    const handleUpvote = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert("Please log in to support a report.");
+                router.push("/login");
+                return;
+            }
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/upvote`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setReport((prev: any) => ({
+                ...prev,
+                upvoteCount: res.data.upvoteCount,
+                upvotedBy: res.data.upvotedBy
+            }));
+        } catch (err) {
+            console.error("Failed to upvote:", err);
+            alert("Something went wrong while upvoting.");
+        }
+    };
+
+    const hasUserUpvoted = () => {
+        const userId = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!)._id : null;
+        if (!userId || !report?.upvotedBy) return false;
+        return report.upvotedBy.includes(userId);
+    };
+
+    const handleAddComment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newComment.trim()) return;
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            alert("Please log in to leave a comment.");
+            router.push("/login");
+            return;
+        }
+
+        setSubmittingComment(true);
+        try {
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/comments`, 
+                { text: newComment },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            
+            // The API returns the updated comments array, which should be populated
+            setReport((prev: any) => ({
+                ...prev,
+                comments: res.data
+            }));
+            setNewComment("");
+        } catch (err) {
+            console.error("Failed to add comment:", err);
+            alert("Failed to add comment. Please try again.");
+        } finally {
+            setSubmittingComment(false);
+        }
+    };
+
+    const handleShare = async (platform?: 'whatsapp' | 'twitter' | 'copy') => {
+        const shareUrl = window.location.href;
+        const shareTitle = `Civic Issue: ${report?.aiSummary || report?.category}`;
+        const shareText = `Check out this civic issue on CivicLens. Let's get it fixed together!`;
+
+        if (!platform && navigator.share) {
+            try {
+                await navigator.share({
+                    title: shareTitle,
+                    text: shareText,
+                    url: shareUrl,
+                });
+                return;
+            } catch (err) {
+                console.log('Native share failed or cancelled', err);
+                // Fallthrough to manual options
+            }
+        }
+
+        if (platform === 'whatsapp') {
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + " " + shareUrl)}`);
+        } else if (platform === 'twitter') {
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`);
+        } else {
+            // Default: Copy to clipboard
+            navigator.clipboard.writeText(shareUrl);
+            alert("Link copied to clipboard!");
+        }
+    };
+
+    const handleTranslate = async () => {
+        if (translatedText) {
+            // Toggle off if already shown
+            setTranslatedText(null);
+            return;
+        }
+        setTranslating(true);
+        try {
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/translate`);
+            setTranslatedText(res.data.translated);
+        } catch (err) {
+            console.error('Translation failed:', err);
+            alert('Could not translate. Please try again.');
+        } finally {
+            setTranslating(false);
+        }
+    };
 
     return (
         <main className="min-h-screen bg-gray-50 pb-28">
@@ -112,18 +224,79 @@ export default function ReportDetails() {
 
                 {/* AI Summary Card */}
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                        <CheckCircle2 size={18} className="text-green-500" />
-                        AI Analysis
-                    </h3>
+                    <div className="flex justify-between items-start mb-3">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                            <CheckCircle2 size={18} className="text-green-500" />
+                            AI Analysis
+                        </h3>
+                        <button
+                            onClick={handleTranslate}
+                            disabled={translating}
+                            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all shadow-sm shrink-0 ${
+                                translatedText 
+                                    ? 'bg-orange-100 text-orange-700 border border-orange-200' 
+                                    : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                            }`}
+                        >
+                            {translating ? (
+                                <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <Languages size={14} />
+                            )}
+                            {translatedText ? 'EN' : 'हिंदी'}
+                        </button>
+                    </div>
                     <p className="text-gray-600 text-sm leading-relaxed">
                         {report.aiSummary}
                     </p>
+                    {translatedText && (
+                        <div className="mt-3 pt-3 border-t border-blue-100 bg-blue-50/60 rounded-2xl p-3">
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                                <Languages size={12} className="text-blue-500" />
+                                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">हिंदी अनुवाद</span>
+                            </div>
+                            <p className="text-gray-700 text-sm leading-relaxed font-medium">{translatedText}</p>
+                        </div>
+                    )}
                     <div className="mt-4 pt-4 border-t border-gray-50 pt-3 flex flex-col gap-1">
                         <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">Assigned to:</span>
                         <p className="font-semibold text-gray-700 capitalize">{report.department || 'General Administration'}</p>
                     </div>
                 </div>
+
+                {/* Me Too Button */}
+                <button
+                    onClick={handleUpvote}
+                    className={`w-full py-4 rounded-2xl font-bold transition-all shadow-sm flex items-center justify-center gap-2
+                        ${hasUserUpvoted()
+                            ? "bg-blue-600 text-white shadow-blue-200"
+                            : "bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+                        }`}
+                >
+                    <ThumbsUp size={20} className={hasUserUpvoted() ? "fill-current" : ""} />
+                    {hasUserUpvoted() ? "You supported this issue" : 'I face this issue too ("Me Too")'}
+                    <span className="ml-2 bg-white/20 px-2 py-0.5 rounded-full text-sm">
+                        {report.upvoteCount || 0}
+                    </span>
+                </button>
+
+                {/* Proof of Resolution */}
+                {report.status === "Resolved" && report.resolutionImageUrl && (
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-green-200">
+                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                            <CheckCircle2 size={18} className="text-green-500" />
+                            Official Resolution Proof
+                        </h3>
+                        <img 
+                            src={report.resolutionImageUrl} 
+                            alt="Resolution Proof" 
+                            className="w-full h-48 object-cover rounded-2xl mb-3 shadow-inner"
+                        />
+                        <p className="text-sm text-gray-600 font-medium text-center">
+                            This issue has been successfully resolved by the {report.department || "Authorities"}.
+                        </p>
+                    </div>
+                )}
 
                 {/* Community Verification */}
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-green-100">
@@ -155,9 +328,102 @@ export default function ReportDetails() {
                     </div>
                 </div>
 
-                <button className="w-full bg-white border border-green-500 text-green-600 font-bold py-4 rounded-2xl shadow-sm">
+                {/* Social Sharing & Virality */}
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mt-6">
+                    <h3 className="text-center font-bold text-gray-800 mb-1">Make Some Noise! 📣</h3>
+                    <p className="text-center text-xs text-gray-500 mb-4">Share this report to get it fixed faster</p>
+                    <div className="grid grid-cols-2 gap-3 sm:flex sm:justify-center">
+                        <button 
+                            onClick={() => handleShare('whatsapp')}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 py-3 px-4 bg-[#25D366] text-white rounded-2xl font-bold shadow-md hover:bg-[#20bd5a] transition-colors"
+                        >
+                            <Phone size={18} /> WhatsApp
+                        </button>
+                        <button 
+                            onClick={() => handleShare('twitter')}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 py-3 px-4 bg-[#1DA1F2] text-white rounded-2xl font-bold shadow-md hover:bg-[#1a90d9] transition-colors"
+                        >
+                            <Twitter size={18} /> Twitter
+                        </button>
+                        <button 
+                            onClick={() => handleShare('copy')}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 text-gray-700 rounded-2xl font-bold shadow-sm hover:bg-gray-200 transition-colors col-span-2"
+                        >
+                            <LinkIcon size={18} /> Copy Link
+                        </button>
+                        {/* Native Share button visible mainly on mobile */}
+                        <button 
+                            onClick={() => handleShare()}
+                            className="sm:hidden flex-1 sm:flex-none flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 text-white rounded-2xl font-bold shadow-md hover:bg-blue-700 transition-colors col-span-2 mt-[-4px]"
+                        >
+                            <Share2 size={18} /> Share Options
+                        </button>
+                    </div>
+                </div>
+
+                <button className="w-full bg-white border border-green-500 text-green-600 font-bold py-4 rounded-2xl shadow-sm mt-6">
                     View on Map
                 </button>
+
+                {/* Citizen-Authority Chat / Comments */}
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mt-6">
+                    <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <MessageCircle size={18} className="text-blue-500" />
+                        Discussion ({report.comments?.length || 0})
+                    </h3>
+
+                    <div className="space-y-4 max-h-96 overflow-y-auto mb-6 pr-2 custom-scrollbar">
+                        {(!report.comments || report.comments.length === 0) ? (
+                            <p className="text-center text-sm text-gray-400 py-4">No comments yet. Start the conversation!</p>
+                        ) : (
+                            report.comments.map((comment: any, idx: number) => (
+                                <div key={idx} className={`flex flex-col ${comment.isAuthority ? 'items-end' : 'items-start'}`}>
+                                    <div className={`max-w-[85%] rounded-2xl p-4 shadow-sm relative ${
+                                        comment.isAuthority 
+                                            ? 'bg-blue-50 border border-blue-100 rounded-br-sm' 
+                                            : 'bg-gray-50 border border-gray-100 rounded-bl-sm'
+                                    }`}>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-semibold text-sm text-gray-800">
+                                                {comment.user?.name || 'Citizen'}
+                                            </span>
+                                            {comment.isAuthority && (
+                                                <span className="bg-blue-600 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                    <ShieldCheck size={10} /> Official
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">{comment.text}</p>
+                                        <span className="text-[10px] text-gray-400 mt-2 block font-medium">
+                                            {new Date(comment.createdAt).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <form onSubmit={handleAddComment} className="flex gap-2 relative">
+                        <textarea
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            placeholder="Add a comment or update..."
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl py-3 px-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500 transition-all font-medium h-12 min-h-[48px] max-h-32"
+                            rows={1}
+                        />
+                        <button
+                            type="submit"
+                            disabled={submittingComment || !newComment.trim()}
+                            className="bg-green-600 text-white p-3 rounded-2xl font-bold shadow-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shrink-0 w-12 h-12"
+                        >
+                            {submittingComment ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <Send size={18} className="ml-1" />
+                            )}
+                        </button>
+                    </form>
+                </div>
             </div>
         </main>
     );

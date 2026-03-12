@@ -5,8 +5,10 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin } from "lucide-react";
+import { MapPin, Layers } from "lucide-react";
 import { useRouter } from "next/navigation";
+import HeatmapLayer from "./HeatmapLayer";
+import MarkerClusterGroup from "react-leaflet-cluster";
 
 // Fix for default Leaflet icon paths in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -32,6 +34,7 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
     const [reports, setReports] = useState<any[]>([]);
     const [selectedReport, setSelectedReport] = useState<any>(null);
     const [mapCenter, setMapCenter] = useState<[number, number]>([28.6139, 77.2090]); // Default to New Delhi
+    const [isHeatmapMode, setIsHeatmapMode] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -109,19 +112,72 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                 />
 
-                {filteredReports.map((report: any) => (
-                    report.location?.lat !== undefined && report.location?.lng !== undefined ? (
-                        <Marker
-                            key={report._id}
-                            position={[report.location.lat, report.location.lng]}
-                            icon={getMarkerIcon(report.status)}
-                            eventHandlers={{
-                                click: () => setSelectedReport(report),
-                            }}
-                        />
-                    ) : null
-                ))}
+                {isHeatmapMode ? (
+                    <HeatmapLayer 
+                        points={filteredReports
+                            .filter((r: any) => r.location?.lat !== undefined && r.location?.lng !== undefined)
+                            .map((r: any) => {
+                                // Weight severity: High=1, Medium=0.6, Low=0.3
+                                const weight = r.severity === 'High' ? 1 : r.severity === 'Medium' ? 0.6 : 0.3;
+                                return [r.location.lat, r.location.lng, weight] as [number, number, number];
+                            })
+                        } 
+                    />
+                ) : (
+                    <MarkerClusterGroup
+                        chunkedLoading
+                        maxClusterRadius={40}
+                        iconCreateFunction={(cluster: any) => {
+                            const count = cluster.getChildCount();
+                            let size = 'w-10 h-10';
+                            let bg = 'bg-yellow-500';
+                            let shadow = 'shadow-yellow-500/50';
+
+                            if (count > 10) {
+                                size = 'w-12 h-12';
+                                bg = 'bg-orange-500';
+                                shadow = 'shadow-orange-500/50';
+                            }
+                            if (count > 50) {
+                                size = 'w-14 h-14';
+                                bg = 'bg-red-500';
+                                shadow = 'shadow-red-500/50';
+                            }
+
+                            return L.divIcon({
+                                html: `<div class="${size} ${bg} text-white font-bold rounded-full flex items-center justify-center shadow-lg ${shadow} ring-4 ring-white border-2 border-[inherit]">${count}</div>`,
+                                className: 'custom-marker-cluster',
+                                iconSize: L.point(40, 40, true),
+                            });
+                        }}
+                    >
+                        {filteredReports.map((report: any) => (
+                            report.location?.lat !== undefined && report.location?.lng !== undefined ? (
+                                <Marker
+                                    key={report._id}
+                                    position={[report.location.lat, report.location.lng]}
+                                    icon={getMarkerIcon(report.status)}
+                                    eventHandlers={{
+                                        click: () => setSelectedReport(report),
+                                    }}
+                                />
+                            ) : null
+                        ))}
+                    </MarkerClusterGroup>
+                )}
             </MapContainer>
+
+            {/* Heatmap Toggle Button (Top Right, below filters normally, but Top right absolute for map) */}
+            <button
+                onClick={() => {
+                    setIsHeatmapMode(!isHeatmapMode);
+                    setSelectedReport(null);
+                }}
+                className={`absolute top-24 right-4 z-[1000] p-3 rounded-full shadow-lg backdrop-blur-md transition-all ${isHeatmapMode ? 'bg-green-600 text-white' : 'bg-white/90 text-gray-700 hover:bg-white'}`}
+                title={isHeatmapMode ? "Switch to Pin View" : "Switch to Heatmap View"}
+            >
+                <Layers size={22} />
+            </button>
 
             <AnimatePresence>
                 {selectedReport && (
@@ -136,10 +192,11 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
                                 <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full ${getStatusColor(selectedReport.status)}`}>
                                     {selectedReport.status}
                                 </span>
-                                <h3 className="font-bold text-gray-900 mt-2 line-clamp-2">{selectedReport.aiSummary || `${selectedReport.category} Issue`}</h3>
-                                <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                                    <MapPin size={14} /> {selectedReport.location?.address || `Lat: ${selectedReport.location?.lat?.toFixed(4)}, Lng: ${selectedReport.location?.lng?.toFixed(4)}`}
-                                </p>
+                                {selectedReport.upvoteCount > 0 && (
+                                    <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-1 rounded-full">
+                                        👍 {selectedReport.upvoteCount} Let authorities know
+                                    </span>
+                                )}
                             </div>
                             <button
                                 onClick={() => setSelectedReport(null)}
@@ -147,6 +204,12 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
                             >
                                 ✕
                             </button>
+                        </div>
+                        <h3 className="font-bold text-gray-900 mt-2 line-clamp-2">{selectedReport.aiSummary || `${selectedReport.category} Issue`}</h3>
+                        <div className="flex items-center justify-between mt-2 gap-2">
+                            <p className="text-sm text-gray-500 flex items-center gap-1">
+                                <MapPin size={14} /> {selectedReport.location?.address?.substring(0, 30) || `Lat: ${selectedReport.location?.lat?.toFixed(4)}, Lng: ${selectedReport.location?.lng?.toFixed(4)}`}...
+                            </p>
                         </div>
                         <button
                             onClick={() => router.push(`/reports/${selectedReport._id}`)}

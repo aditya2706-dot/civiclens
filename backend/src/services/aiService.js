@@ -91,5 +91,24 @@ const getDepartmentForCategory = (category) => {
 
 module.exports = {
     analyzeImageGemini,
-    getDepartmentForCategory
+    getDepartmentForCategory,
+    translateText
 };
+
+async function translateText(text, targetLanguage = 'Hindi') {
+    try {
+        const prompt = `You are a professional translator. Translate the following civic issue report text to ${targetLanguage}. Keep technical terms and proper nouns (like road names, area names) as is. Return ONLY the translated text, nothing else.\n\nText to translate:\n"${text}"`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt
+        });
+
+        // Extract text from response candidates
+        const translated = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        return translated || text;
+    } catch (error) {
+        console.error('Translation error:', error.message);
+        throw new Error('Translation failed');
+    }
+}

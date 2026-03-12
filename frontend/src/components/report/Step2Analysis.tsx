@@ -58,7 +58,7 @@ export function Step2Analysis({
                     });
 
                     if (response.data.isGenuine === false) {
-                        setError(`Fake Image Detected: ${response.data.fraudReason}`);
+                        setError(`We couldn't identify a valid civic issue in this photo. ${response.data.fraudReason}`);
                         setAnalyzing(false);
                         return;
                     }
@@ -98,7 +98,7 @@ export function Step2Analysis({
                 });
 
                 if (response.data.isGenuine === false) {
-                    setError(`Fake Image Detected: ${response.data.fraudReason}`);
+                    setError(`We couldn't identify a valid civic issue in this photo. ${response.data.fraudReason}`);
                     setAnalyzing(false);
                     return;
                 }
@@ -130,11 +130,20 @@ export function Step2Analysis({
 
     if (error) {
         return (
-            <div className="flex flex-col items-center justify-center h-64 space-y-4">
-                <AlertTriangle size={48} className="text-red-500" />
-                <h3 className="text-lg font-semibold text-gray-700">Analysis Failed</h3>
-                <p className="text-sm text-center text-gray-500">{error}</p>
-                <button onClick={onBack} className="mt-4 px-6 py-2 bg-gray-100 rounded-full font-medium text-gray-700">Go Back</button>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 px-4">
+                <div className="bg-red-50 p-6 rounded-full">
+                    <AlertTriangle size={64} className="text-red-500" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Invalid Report</h3>
+                <p className="text-base text-center text-gray-600 max-w-sm">
+                    {error}
+                </p>
+                <button 
+                    onClick={onBack} 
+                    className="mt-6 px-8 py-4 w-full max-w-xs bg-gray-900 text-white rounded-2xl font-bold shadow-lg hover:bg-gray-800 transition-colors"
+                >
+                    Take a New Photo
+                </button>
             </div>
         );
     }
