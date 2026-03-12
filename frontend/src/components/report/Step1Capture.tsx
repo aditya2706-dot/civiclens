@@ -1,6 +1,6 @@
 import { Camera, MapPin, Upload, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export function Step1Capture({
     onNext,
@@ -14,6 +14,13 @@ export function Step1Capture({
     const [isLocating, setIsLocating] = useState(false);
     const [locationError, setLocationError] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        // Automatically ask for location as soon as the component mounts
+        if (!data.location) {
+            fetchLocation();
+        }
+    }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
