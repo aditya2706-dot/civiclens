@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Calendar, ThumbsUp, ThumbsDown, CheckCircle2, Send, MessageCircle, ShieldCheck, Share2, Link as LinkIcon, Twitter, Phone, Languages } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, ThumbsUp, ThumbsDown, CheckCircle2, Send, MessageCircle, ShieldCheck, Share2, Link as LinkIcon, Twitter, Phone, Languages, Trash2 } from "lucide-react";
 import axios from "axios";
 
 export default function ReportDetails() {
@@ -16,6 +16,28 @@ export default function ReportDetails() {
     const [submittingComment, setSubmittingComment] = useState(false);
     const [translatedText, setTranslatedText] = useState<string | null>(null);
     const [translating, setTranslating] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = async () => {
+        if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
+
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        setIsDeleting(true);
+        try {
+            await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert("Report deleted successfully.");
+            router.push("/reports");
+        } catch (err) {
+            console.error("Failed to delete report:", err);
+            alert("Failed to delete report. Only the owner can delete their own report.");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     useEffect(() => {
         const fetchReport = async () => {
@@ -205,6 +227,31 @@ export default function ReportDetails() {
                         {report.status}
                     </span>
                 </div>
+
+                {/* Ownership Check for Deletion */}
+                {(() => {
+                    const localUser = localStorage.getItem('user');
+                    const userId = localUser ? JSON.parse(localUser)._id : null;
+                    const isOwner = userId && report.userId && (report.userId === userId || report.userId._id === userId);
+                    
+                    if (isOwner) {
+                        return (
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="absolute top-6 right-6 z-10 w-10 h-10 bg-red-500/80 backdrop-blur rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors shadow-lg"
+                                title="Delete Report"
+                            >
+                                {isDeleting ? (
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                    <Trash2 size={18} />
+                                )}
+                            </button>
+                        );
+                    }
+                    return null;
+                })()}
             </div>
 
             <div className="p-6 space-y-6">

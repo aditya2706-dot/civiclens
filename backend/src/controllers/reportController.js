@@ -284,8 +284,40 @@ module.exports = {
     verifyReport,
     toggleUpvote,
     addComment,
-    translateReport
+    translateReport,
+    deleteReport
 };
+
+// @desc    Delete a report
+// @route   DELETE /api/reports/:id
+// @access  Private
+async function deleteReport(req, res) {
+    try {
+        const report = await Report.findById(req.params.id);
+
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        // Feature: Only authenticated reports can be deleted by their owners
+        if (!report.userId) {
+            return res.status(400).json({ message: 'Anonymous reports cannot be deleted for audit reasons.' });
+        }
+
+        if (report.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'You are not authorized to delete this report.' });
+        }
+
+        // Delete associated notifications as well
+        await Notification.deleteMany({ reportId: report._id });
+        
+        await Report.findByIdAndDelete(req.params.id);
+
+        res.json({ message: 'Report deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting report', error: error.message });
+    }
+}
 
 // @desc    Translate report text to Hindi using Gemini AI
 // @route   POST /api/reports/:id/translate

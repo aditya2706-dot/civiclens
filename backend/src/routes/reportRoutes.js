@@ -10,7 +10,8 @@ const {
     verifyReport,
     toggleUpvote,
     addComment,
-    translateReport
+    translateReport,
+    deleteReport
 } = require('../controllers/reportController');
 const { protect, optionalAuth, admin, authority, adminOrAuthority } = require('../middlewares/authMiddleware');
 
@@ -24,7 +25,7 @@ router.route('/').get(getReports).post(optionalAuth, submitReport);
 router.route('/analyze').post(analyzeImage);
 
 // Public route to get specific report, vote, comment, translate
-router.route('/:id').get(getReportById);
+router.route('/:id').get(getReportById).delete(protect, deleteReport);
 router.route('/:id/verify').post(verifyReport);
 router.route('/:id/upvote').post(protect, toggleUpvote);
 router.route('/:id/comments').post(protect, addComment);

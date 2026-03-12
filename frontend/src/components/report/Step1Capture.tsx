@@ -1,4 +1,4 @@
-import { Camera, MapPin, Upload, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Camera, MapPin, Upload, Loader2, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 
@@ -13,14 +13,24 @@ export function Step1Capture({
 }) {
     const [isLocating, setIsLocating] = useState(false);
     const [locationError, setLocationError] = useState("");
+    const [showHint, setShowHint] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         // Automatically ask for location as soon as the component mounts
         if (!data.location) {
             fetchLocation();
+            
+            // Show a helpful hint if location isn't acquired within 5 seconds
+            const timer = setTimeout(() => {
+                if (!data.location) {
+                    setShowHint(true);
+                }
+            }, 5000);
+            
+            return () => clearTimeout(timer);
         }
-    }, []);
+    }, [data.location]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -166,6 +176,24 @@ export function Step1Capture({
                     <p className="text-[10px] text-red-500 mt-2 px-1 font-medium leading-tight">{locationError}</p>
                 )}
             </div>
+
+            {showHint && !data.location && (
+                <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3"
+                >
+                    <div className="bg-blue-100 p-2 rounded-full h-fit text-blue-600">
+                        <Info size={18} />
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-bold text-blue-800">Need Location Permission?</h4>
+                        <p className="text-xs text-blue-600 leading-normal mt-0.5">
+                            Please ensure your phone's GPS is ON and you've clicked **"Allow"** on the browser's location prompt. This is required for valid reporting.
+                        </p>
+                    </div>
+                </motion.div>
+            )}
 
             {/* Manual override / next step if location failed but they want to proceed (optional, depends on strictness) */}
             {(data.imageUrl && !isLocating) && (
