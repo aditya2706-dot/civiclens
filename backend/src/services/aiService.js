@@ -6,26 +6,32 @@ const ai = new GoogleGenAI({
 
 const analyzeImageGemini = async (imageBase64, mimeType, addressContext = '') => {
     try {
-        let prompt = `You are a civic issue analyzer for a 311-style city reporting app. 
-        Analyze the provided image and generate a structured JSON response about the civic issue visible.
-        Only consider issues like Litter, Open Dump, Pothole, Streetlight problems, or Sewage leaks.
-        If it's none of those, categorize it as 'Other'.
+        let prompt = `You are a professional civic issue analyzer for a city reporting application. Your job is to strictly validate and categorize photos of infrastructure problems.
         
-        CRITICAL FRAUD CHECK: Is this a real, genuine photo taken live, or does it look like a downloaded stock image, a meme, or a computer screen capture? If it looks fake or unrelated, set "isGenuine" to false and briefly explain why in "fraudReason".
+        STRICT VALIDATION RULES:
+        1. ONLY accept photos of PUBLIC CIVIC INFRASTRUCTURE issues.
+        2. ACCEPTABLE CATEGORIES: Litter, Open Dump (Garbage pile), Pothole (Road damage), Streetlight (Broken/Dark), Sewage (Leaks/Flow), or General Infrastructure (Broken public benches, damaged sidewalks).
+        3. REJECT IF: The photo is of a private interior (home floor, bedroom), personal items (furniture, electronics), pets, people, selfies, screenshots, or any non-infrastructure object.
+        4. REJECT IF: The photo is a meme, stock image, or computer screen.
+
+        RESPONSE PARAMETERS:
+        - "isGenuine": Set to false if the photo is NOT a public civic infrastructure issue.
+        - "fraudReason": If isGenuine is false, explain why (e.g., "Photo appears to be of a private residence floor, which is not a civic issue").
+        - "suggestedCategory": Choose exactly one: Litter, Open Dump, Pothole, Streetlight, Sewage, Infrastructure.
         
-        Provide the response strictly following this JSON structure, and nothing else:
+        Provide the response strictly following this JSON structure:
         {
-          "summary": "A 1-2 sentence description of the problem",
-          "detectedObjects": ["list", "of", "relevant", "objects", "seen"],
-          "suggestedCategory": "One of: Litter, Open Dump, Pothole, Streetlight, Sewage, Other",
-          "estimatedSeverity": "One of: Low, Medium, High",
+          "summary": "1-2 sentence description of the problem",
+          "detectedObjects": ["list", "of", "relevant", "objects"],
+          "suggestedCategory": "String category name",
+          "estimatedSeverity": "Low, Medium, or High",
           "suggestedWard": "String or Unknown",
-          "isGenuine": true or false,
-          "fraudReason": "string explanation if fake, otherwise empty string"
+          "isGenuine": boolean,
+          "fraudReason": "string explanation"
         }`;
 
         if (addressContext) {
-            prompt += `\n\nAdditionally, the image was taken at this address in India: "${addressContext}". Based on this address, predict the specific Nagar Nigam Ward name or number (e.g. 'Ward 42', 'Civil Lines Ward'). If you cannot determine the specific ward, return the locality name. Put this prediction in the "suggestedWard" field.`;
+            prompt += `\n\nLOCATION CONTEXT: The photo was taken at "${addressContext}". Use this to refine the "suggestedWard" if possible.`;
         } else {
             prompt += `\n\nFor "suggestedWard", return "Unknown".`;
         }

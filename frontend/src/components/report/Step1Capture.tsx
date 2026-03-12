@@ -1,4 +1,4 @@
-import { Camera, MapPin, Upload, Loader2, CheckCircle2 } from "lucide-react";
+import { Camera, MapPin, Upload, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useRef } from "react";
 
@@ -38,7 +38,7 @@ export function Step1Capture({
         }
     };
 
-    const fetchLocation = (capturedImageUrl: string) => {
+    const fetchLocation = (capturedImageUrl?: string) => {
         setIsLocating(true);
         setLocationError("");
 
@@ -48,36 +48,30 @@ export function Step1Capture({
             return;
         }
 
+        const urlToUse = capturedImageUrl || data.imageUrl;
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 setIsLocating(false);
                 updateData({
                     ...data,
-                    imageUrl: capturedImageUrl,
+                    imageUrl: urlToUse,
                     location: {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
                     }
                 });
                 // Short delay so user sees location success before moving to next step
-                setTimeout(onNext, 1000);
+                if (capturedImageUrl) {
+                    setTimeout(onNext, 1000);
+                }
             },
             (error) => {
                 setIsLocating(false);
-                setLocationError("Failed to get location. Using default location for testing.");
+                setLocationError("Location access denied or failed. Please enable GPS and allow location access to report an issue.");
                 console.error("Error getting location:", error);
-
-                // Provide a default fallback location (New Delhi) so testing isn't blocked
-                updateData({
-                    ...data,
-                    imageUrl: capturedImageUrl,
-                    location: {
-                        lat: 28.6139,
-                        lng: 77.2090
-                    }
-                });
-                // Short delay so user sees location fallback message before moving to next step
-                setTimeout(onNext, 1500);
+                
+                // CRITICAL: Removed fallback location to ensure only genuine reports are submitted
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
@@ -132,8 +126,8 @@ export function Step1Capture({
 
             <div className={`bg-white rounded-2xl p-4 shadow-sm border flex flex-col gap-2 ${locationError ? 'border-red-200' : 'border-gray-100'}`}>
                 <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl flex-shrink-0 ${data.location ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-                        {isLocating ? <Loader2 className="animate-spin" size={24} /> : (data.location ? <CheckCircle2 size={24} /> : <MapPin size={24} />)}
+                    <div className={`p-3 rounded-xl flex-shrink-0 ${data.location ? 'bg-green-100 text-green-600' : (locationError ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500')}`}>
+                        {isLocating ? <Loader2 className="animate-spin" size={24} /> : (data.location ? <CheckCircle2 size={24} /> : (locationError ? <AlertTriangle size={24} /> : <MapPin size={24} />))}
                     </div>
                     <div className="flex-1">
                         {data.location ? (
@@ -144,17 +138,25 @@ export function Step1Capture({
                         ) : (
                             <>
                                 <h4 className="font-semibold text-gray-800 text-sm mb-1">
-                                    {isLocating ? 'Detecting location...' : 'Location Required'}
+                                    {isLocating ? 'Detecting location...' : (locationError ? 'Location Error' : 'Location Required')}
                                 </h4>
                                 <p className="text-xs text-gray-400">
-                                    {isLocating ? 'Please wait...' : 'Will be auto-detected upon capture'}
+                                    {isLocating ? 'Please wait...' : (locationError ? 'GPS access is mandatory' : 'Will be auto-detected upon capture')}
                                 </p>
                             </>
                         )}
                     </div>
+                    {locationError && !isLocating && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); fetchLocation(); }}
+                            className="bg-red-500 text-white text-[10px] font-bold px-3 py-2 rounded-lg hover:bg-red-600 transition-colors"
+                        >
+                            RETRY
+                        </button>
+                    )}
                 </div>
                 {locationError && (
-                    <p className="text-xs text-red-500 mt-2 px-1 font-medium">{locationError}</p>
+                    <p className="text-[10px] text-red-500 mt-2 px-1 font-medium leading-tight">{locationError}</p>
                 )}
             </div>
 
