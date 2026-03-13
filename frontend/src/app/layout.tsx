@@ -15,9 +15,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} antialiased bg-gray-50`}>
+      <body className={`${inter.className} antialiased bg-slate-50 text-slate-900`}>
         <LanguageProvider>
-          <div className="max-w-md mx-auto min-h-screen bg-white shadow-xl relative pb-28">
+          <div className="max-w-md mx-auto min-h-screen bg-white shadow-[0_0_50px_-12px_rgba(0,0,0,0.1)] relative pb-28 overflow-x-hidden border-x border-gray-100/50">
             {children}
             <BottomNav />
           </div>

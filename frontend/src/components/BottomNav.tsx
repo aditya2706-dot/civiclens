@@ -47,8 +47,8 @@ export default function BottomNav() {
     };
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-6 pt-2 bg-white/80 backdrop-blur-md border-t border-gray-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)] rounded-t-3xl">
-            <div className="max-w-md mx-auto relative flex justify-between items-center px-2">
+        <div className="fixed bottom-0 left-0 right-0 z-[1000] px-4 pb-8 pt-4">
+            <div className="max-w-md mx-auto relative flex justify-between items-center px-6 py-2 bg-white/80 backdrop-blur-2xl border border-white/40 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] rounded-[32px]">
 
                 {/* Left Items */}
                 <div className="flex w-2/5 justify-between">
@@ -58,15 +58,15 @@ export default function BottomNav() {
                 </div>
 
                 {/* Center Floating Button */}
-                <div className="absolute left-1/2 -top-10 transform -translate-x-1/2">
+                <div className="absolute left-1/2 -top-12 transform -translate-x-1/2">
                     <Link href="/report">
                         <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-xl flex items-center justify-center text-white relative group"
+                            whileHover={{ y: -5, scale: 1.05 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-green-400 via-green-600 to-green-700 shadow-[0_15px_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center text-white relative group border-4 border-white"
                         >
-                            <Plus size={32} strokeWidth={2.5} />
-                            <div className="absolute inset-0 rounded-full bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
+                            <Plus size={36} strokeWidth={3} />
+                            <div className="absolute inset-0 rounded-[20px] bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
                         </motion.div>
                     </Link>
                 </div>

@@ -44,14 +44,19 @@ export default function MyReports() {
     });
 
     return (
-        <main className="min-h-screen bg-gray-50 flex flex-col pt-8 px-6 pb-32">
-            <header className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">My Reports</h1>
-                <p className="text-gray-500 text-sm">Track your contributions to the city</p>
+        <main className="min-h-screen bg-slate-50 flex flex-col pt-12 px-5 pb-32">
+            <header className="mb-8 flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Discover</h1>
+                    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-1">Community Feed</p>
+                </div>
+                <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+                    <Calendar size={18} className="text-slate-400" />
+                </div>
             </header>
 
             {/* Filter Bar */}
-            <div className="-mx-6 mb-6">
+            <div className="-mx-5 mb-8">
                 <FilterBar 
                     selectedStatus={filter}
                     setSelectedStatus={setFilter}
@@ -61,49 +66,57 @@ export default function MyReports() {
             </div>
 
             {/* Reports List */}
-            <div className="space-y-4">
+            <div className="grid gap-6">
                 <AnimatePresence>
                     {filteredReports.map((report) => (
                         <Link href={`/reports/${report._id}`} key={report._id}>
                             <motion.div
                                 layout
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.2 }}
-                                className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 flex flex-col group cursor-pointer hover:shadow-md transition-shadow"
+                                transition={{ duration: 0.3, ease: "easeOut" }}
+                                className="bg-white rounded-[32px] p-2.5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden group cursor-pointer hover:shadow-xl hover:border-green-100 transition-all duration-500"
                             >
-                                <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4">
+                                <div className="relative w-full h-52 rounded-[24px] overflow-hidden">
                                     <img
                                         src={report.imageUrl || "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80&w=600"}
                                         alt={report.category}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out"
                                     />
-                                    <div className="absolute top-3 left-3">
-                                        <span className="bg-white/90 backdrop-blur text-gray-800 text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-                                            {report.category}
-                                        </span>
+                                    <div className="absolute top-4 left-4">
+                                        <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-xl flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                            <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">
+                                                {report.category}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="absolute bottom-4 left-4 right-4">
+                                         <div className="glass-effect p-3 rounded-2xl flex justify-between items-center shadow-2xl">
+                                            <div className="flex items-center gap-2 text-white">
+                                                <MapPin size={12} className="text-green-400" />
+                                                <span className="text-[10px] font-bold truncate max-w-[150px]">
+                                                    {report.location?.address?.split(',')[0] || "Live Location"}
+                                                </span>
+                                            </div>
+                                            <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-wider ${
+                                                report.status === 'Resolved' ? 'bg-green-500/90 text-white' : 
+                                                report.status === 'Under Review' ? 'bg-yellow-500/90 text-white' : 'bg-red-500/90 text-white'
+                                            }`}>
+                                                {report.status}
+                                            </span>
+                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="px-1">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-bold text-gray-800 line-clamp-1">{report.aiSummary || report.category + " Issue"}</h3>
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md border whitespace-nowrap ml-2 ${getStatusColor(report.status)}`}>
-                                            {report.status}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center gap-4 text-xs text-gray-500 font-medium">
-                                        <div className="flex items-center gap-1">
-                                            <MapPin size={12} />
-                                            <span className="truncate max-w-[120px]">Lat: {report.location?.lat?.toFixed(4) || "0.0"}, Lng: {report.location?.lng?.toFixed(4) || "0.0"}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <Calendar size={12} />
-                                            <span>{report.createdAt ? new Date(report.createdAt).toLocaleDateString() : 'Recently'}</span>
-                                        </div>
-                                    </div>
+                                <div className="pt-4 pb-2 px-3">
+                                    <h3 className="font-extrabold text-slate-900 text-base leading-tight group-hover:text-green-700 transition-colors line-clamp-2 mb-1">
+                                        {report.aiSummary || report.category + " Issue"}
+                                    </h3>
+                                    <p className="text-[11px] text-slate-400 font-medium">
+                                        {report.createdAt ? new Date(report.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently Reported'}
+                                    </p>
                                 </div>
                             </motion.div>
                         </Link>

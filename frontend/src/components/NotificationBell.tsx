@@ -72,11 +72,14 @@ export default function NotificationBell() {
         <div className="relative z-[1001]">
             <button 
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shadow-sm relative hover:bg-green-50 transition-colors"
+                className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center shadow-sm relative hover:bg-green-50 hover:border-green-200 group transition-all"
             >
-                <Bell size={24} className="text-gray-600" />
+                <Bell size={20} className="text-slate-500 group-hover:text-green-600 transition-colors" />
                 {unreadCount > 0 && (
-                    <span className="absolute top-2 right-2 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
+                    </span>
                 )}
             </button>
 
@@ -91,56 +94,68 @@ export default function NotificationBell() {
                             onClick={() => setIsOpen(false)}
                         />
                         <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            initial={{ opacity: 0, y: 15, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute right-0 top-14 w-80 bg-white rounded-3xl shadow-xl overflow-hidden z-50 border border-gray-100"
+                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                            className="absolute right-0 top-14 w-80 bg-white/95 backdrop-blur-2xl rounded-[32px] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] overflow-hidden z-50 border border-white/40"
                         >
-                            <div className="bg-green-50 px-4 py-3 border-b border-green-100 flex justify-between items-center">
-                                <h3 className="font-bold text-green-900">Notifications</h3>
+                            <div className="bg-slate-50/50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                                <h3 className="font-black text-slate-900 text-sm tracking-tight uppercase">Notifications</h3>
                                 {unreadCount > 0 && (
                                     <button 
                                         onClick={markAllAsRead}
-                                        className="text-xs font-semibold text-green-600 hover:text-green-800"
+                                        className="text-[10px] font-black text-green-600 hover:text-green-800 uppercase tracking-wider"
                                     >
-                                        Mark all as read
+                                        Mark all
                                     </button>
                                 )}
                             </div>
                             
-                            <div className="max-h-96 overflow-y-auto">
+                            <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
                                 {notifications.length === 0 ? (
-                                    <div className="p-6 text-center text-gray-500 text-sm">
-                                        No new notifications
+                                    <div className="py-12 px-6 text-center">
+                                        <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                                            <Bell size={20} className="text-slate-300" />
+                                        </div>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">All caught up!</p>
                                     </div>
                                 ) : (
-                                    <ul className="divide-y divide-gray-50">
+                                    <ul className="divide-y divide-slate-50">
                                         {notifications.map((notif) => (
                                             <li 
                                                 key={notif._id} 
                                                 onClick={() => handleNotificationClick(notif)}
-                                                className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${!notif.isRead ? 'bg-blue-50/50' : 'opacity-70'}`}
+                                                className={`p-5 hover:bg-slate-50 cursor-pointer transition-all duration-300 ${!notif.isRead ? 'bg-green-50/30' : 'opacity-60'}`}
                                             >
-                                                <div className="flex justify-between items-start gap-3">
-                                                    <div className="flex-1">
-                                                        <h4 className={`text-sm ${!notif.isRead ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                                                <div className="flex gap-4">
+                                                    <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${
+                                                        notif.type === 'NEW_REPORT' ? 'bg-blue-100 text-blue-600' : 
+                                                        notif.type === 'STATUS_UPDATE' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'
+                                                    }`}>
+                                                        {notif.type === 'NEW_REPORT' ? <Plus size={18} /> : <Check size={18} />}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className={`text-sm leading-tight ${!notif.isRead ? 'font-black text-slate-900' : 'font-bold text-slate-600'}`}>
                                                             {notif.title}
                                                         </h4>
-                                                        <p className="text-xs text-gray-600 mt-1 line-clamp-2 leading-relaxed">
+                                                        <p className="text-xs text-slate-500 mt-1 lines-clamp-2 leading-relaxed font-medium">
                                                             {notif.message}
                                                         </p>
-                                                        <span className="text-[10px] text-gray-400 mt-2 block font-medium">
-                                                            {new Date(notif.createdAt).toLocaleDateString()}
+                                                        <span className="text-[9px] text-slate-400 mt-2 block font-black uppercase tracking-wider">
+                                                            {new Date(notif.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                                         </span>
                                                     </div>
-                                                    {!notif.isRead && (
-                                                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-1 shrink-0"></div>
-                                                    )}
                                                 </div>
                                             </li>
                                         ))}
                                     </ul>
                                 )}
+                            </div>
+                            <div className="p-4 bg-slate-50/30 border-t border-slate-100 text-center">
+                                <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors">
+                                    View Settings
+                                </button>
                             </div>
                         </motion.div>
                     </>
