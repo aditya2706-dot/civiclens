@@ -51,7 +51,7 @@ const analyzeImageGemini = async (imageBase64, mimeType, addressContext = '', de
         }
 
         const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-2.5-flash',
             contents: [
                 prompt,
                 {
@@ -120,7 +120,7 @@ async function translateText(text, targetLanguage = 'Hindi') {
         const prompt = `You are a professional translator. Translate the following civic issue report text to ${targetLanguage}. Keep technical terms and proper nouns (like road names, area names) as is. Return ONLY the translated text, nothing else.\n\nText to translate:\n"${text}"`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-2.5-flash',
             contents: prompt
         });
 
