@@ -8,7 +8,7 @@ const { getWardFromCoordinates } = require('../utils/wardDetector');
 // @desc    Analyze uploaded image with Gemini
 // @route   POST /api/reports/analyze
 // @access  Public
-exports.analyzeImage = async (req, res) => {
+const analyzeImage = async (req, res) => {
     try {
         const { imageBase64, mimeType, location, addressContext } = req.body;
 
