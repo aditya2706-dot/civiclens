@@ -3,38 +3,32 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { analyzeImageGemini, getDepartmentForCategory, translateText } = require('../services/aiService');
 const axios = require('axios');
+const { getWardFromCoordinates } = require('../utils/wardDetector');
 
 // @desc    Analyze uploaded image with Gemini
 // @route   POST /api/reports/analyze
 // @access  Public
-const analyzeImage = async (req, res) => {
+exports.analyzeImage = async (req, res) => {
     try {
-        const { imageBase64, mimeType, location } = req.body;
+        const { imageBase64, mimeType, location, addressContext } = req.body;
 
         if (!imageBase64) {
-            return res.status(400).json({ message: 'Missing imageBase64 data' });
+            return res.status(400).json({ message: "Image data is required" });
         }
 
-        let addressContext = '';
+        // Feature: Automatic Ward Detection (Local Polygon Only)
+        // This avoids 429 Status code from external geocoding APIs
+        let detectedWard = null;
         if (location && location.lat && location.lng) {
-            try {
-                // Fetch reverse geocoding from OpenStreetMap Nominatim
-                // Requires a User-Agent, so we use a dummy one
-                const geoRes = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}`, {
-                    headers: { 'User-Agent': 'CivicLensApp/1.0' }
-                });
-                if (geoRes.data && geoRes.data.display_name) {
-                    addressContext = geoRes.data.display_name;
-                }
-            } catch (err) {
-                console.error("Geocoding error:", err.message);
-            }
+            detectedWard = getWardFromCoordinates(location.lat, location.lng);
         }
 
-        const aiAnalysis = await analyzeImageGemini(imageBase64, mimeType || 'image/jpeg', addressContext);
+        // Pass location to AI so it can do its own internal geocoding as a fallback
+        const aiAnalysis = await analyzeImageGemini(imageBase64, mimeType || 'image/jpeg', addressContext, detectedWard, location);
         res.json(aiAnalysis);
 
     } catch (error) {
+        console.error("AI Analysis Error:", error.message);
         res.status(500).json({ message: 'Error analyzing image', error: error.message });
     }
 };

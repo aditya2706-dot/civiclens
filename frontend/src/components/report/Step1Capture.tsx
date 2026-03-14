@@ -67,6 +67,8 @@ export function Step1Capture({
 
         const urlToUse = capturedImageUrl || data.imageUrl;
 
+        const options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 setIsLocating(false);
@@ -84,13 +86,36 @@ export function Step1Capture({
                 }
             },
             (error) => {
+                if (error.code === 3 && options.enableHighAccuracy) {
+                    // Timeout with high accuracy - retry with low accuracy
+                    console.warn("High accuracy location timeout, retrying with low accuracy...");
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            setIsLocating(false);
+                            updateData({
+                                ...data,
+                                imageUrl: urlToUse,
+                                location: {
+                                    lat: pos.coords.latitude,
+                                    lng: pos.coords.longitude
+                                }
+                            });
+                            if (capturedImageUrl) setTimeout(onNext, 1000);
+                        },
+                        (err) => {
+                            setIsLocating(false);
+                            setLocationError("Could not detect location. Please ensure GPS is active and you are in an open area.");
+                            console.error("Location error (fallback):", err);
+                        },
+                        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+                    );
+                    return;
+                }
                 setIsLocating(false);
                 setLocationError("Location access denied or failed. Please enable GPS and allow location access to report an issue.");
                 console.error("Error getting location:", error);
-                
-                // CRITICAL: Removed fallback location to ensure only genuine reports are submitted
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            options
         );
     };
 
