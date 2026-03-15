@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Check, Edit2, AlertTriangle, Box, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { compressImage, blobToBase64 } from "@/utils/imageUtils";
 
 export function Step2Analysis({
     onNext,
@@ -46,50 +47,37 @@ export function Step2Analysis({
                     fileBlob = await response.blob();
                 }
 
+                let base64DataOnly: string;
+                let mimeType: string;
+                let finalPreviewUrl: string;
+
                 if (!fileBlob && data.imageUrl.startsWith("data:image")) {
-                    // It's already a base64 string
-                    const base64DataOnly = data.imageUrl.split(',')[1];
-                    const mimeType = data.imageUrl.split(';')[0].split(':')[1];
-
-                    const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/analyze`, {
-                        imageBase64: base64DataOnly,
-                        mimeType: mimeType,
-                        location: data.location
-                    });
-
-                    if (response.data.isGenuine === false) {
-                        setError(`We couldn't identify a valid civic issue in this photo. ${response.data.fraudReason}`);
-                        setAnalyzing(false);
-                        return;
-                    }
-
-                    updateData({
-                        ...data,
-                        base64Image: data.imageUrl,
-                        aiAnalysis: {
-                            summary: response.data.summary,
-                            detectedObjects: response.data.detectedObjects,
-                            suggestedCategory: response.data.suggestedCategory,
-                            computedSeverity: response.data.estimatedSeverity,
-                            department: response.data.department,
-                            suggestedWard: response.data.suggestedWard
-                        }
-                    });
-                    setAnalyzing(false);
-                    return;
+                    // If it's already a base64 string (camera capture usually), we still compress it
+                    // Convert dataURL to blob first
+                    const response = await fetch(data.imageUrl);
+                    const blob = await response.blob();
+                    
+                    console.log(`Original size: ${(blob.size / 1024).toFixed(2)} KB`);
+                    const compressedBlob = await compressImage(blob);
+                    console.log(`Compressed size: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
+                    
+                    base64DataOnly = await blobToBase64(compressedBlob);
+                    mimeType = 'image/jpeg';
+                    finalPreviewUrl = data.imageUrl; // Keep high-res for preview if desired, or use compressed
+                } else if (fileBlob) {
+                    // Regular file/blob from capture or upload
+                    console.log(`Original size: ${(fileBlob.size / 1024).toFixed(2)} KB`);
+                    const compressedBlob = await compressImage(fileBlob);
+                    console.log(`Compressed size: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
+                    
+                    base64DataOnly = await blobToBase64(compressedBlob);
+                    mimeType = 'image/jpeg';
+                    
+                    // Generate a new preview URL for the compressed image to use in later steps
+                    finalPreviewUrl = URL.createObjectURL(compressedBlob);
+                } else {
+                    throw new Error("No image data found to analyze");
                 }
-
-                // Read image as base64 using a Promise
-                const readAsDataURL = (blob: Blob) => new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                });
-
-                const base64data = await readAsDataURL(fileBlob);
-                const base64DataOnly = base64data.split(',')[1];
-                const mimeType = fileBlob.type || 'image/jpeg';
 
                 const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/analyze`, {
                     imageBase64: base64DataOnly,
@@ -105,7 +93,8 @@ export function Step2Analysis({
 
                 updateData({
                     ...data,
-                    base64Image: base64data,
+                    imageUrl: finalPreviewUrl, // Swap with optimized URL
+                    base64Image: `data:${mimeType};base64,${base64DataOnly}`,
                     aiAnalysis: {
                         summary: response.data.summary,
                         detectedObjects: response.data.detectedObjects,
