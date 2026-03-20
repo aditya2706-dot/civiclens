@@ -106,12 +106,12 @@ const getReports = async (req, res) => {
 const getAuthorityReports = async (req, res) => {
     try {
         const { status } = req.query;
-        let query = {
-            department: req.user.department,
-        };
+        let query = {};
 
-        if (req.user.ward) {
-            query.ward = req.user.ward;
+        // If not a global admin, restrict to their specific department and ward
+        if (req.user.role !== 'admin') {
+            if (req.user.department) query.department = req.user.department;
+            if (req.user.ward) query.ward = req.user.ward;
         }
 
         if (status) query.status = status;
@@ -123,6 +123,48 @@ const getAuthorityReports = async (req, res) => {
     }
 };
 
+
+// @desc    Get ward statistics
+// @route   GET /api/reports/stats/ward
+// @access  Public
+const getWardStats = async (req, res) => {
+    try {
+        const stats = await Report.aggregate([
+            {
+                $group: {
+                    _id: "$ward",
+                    totalReports: { $sum: 1 },
+                    resolvedReports: {
+                        $sum: { $cond: [{ $eq: ["$status", "Resolved"] }, 1, 0] }
+                    },
+                    pendingReports: {
+                        $sum: { $cond: [{ $in: ["$status", ["Pending", "In Progress", "Under Review"]] }, 1, 0] }
+                    }
+                }
+            },
+            {
+                $project: {
+                    ward: { $ifNull: ["$_id", "Unknown Ward"] },
+                    totalReports: 1,
+                    resolvedReports: 1,
+                    pendingReports: 1,
+                    resolutionRate: {
+                        $cond: [
+                            { $eq: ["$totalReports", 0] },
+                            0,
+                            { $multiply: [{ $divide: ["$resolvedReports", "$totalReports"] }, 100] }
+                        ]
+                    }
+                }
+            },
+            { $sort: { totalReports: -1 } }
+        ]);
+
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching ward stats', error: error.message });
+    }
+};
 
 // @desc    Get a single report by ID
 // @route   GET /api/reports/:id
@@ -279,7 +321,8 @@ module.exports = {
     toggleUpvote,
     addComment,
     translateReport,
-    deleteReport
+    deleteReport,
+    getWardStats
 };
 
 // @desc    Delete a report

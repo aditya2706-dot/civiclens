@@ -11,18 +11,22 @@ const {
     toggleUpvote,
     addComment,
     translateReport,
-    deleteReport
+    deleteReport,
+    getWardStats
 } = require('../controllers/reportController');
 const { protect, optionalAuth, admin, authority, adminOrAuthority } = require('../middlewares/authMiddleware');
 
 // Authority route to get their assigned reports
-router.route('/authority').get(protect, authority, getAuthorityReports);
+router.route('/authority').get(protect, adminOrAuthority, getAuthorityReports);
 
 // Public route to get reports and submit (optionally authenticated)
 router.route('/').get(getReports).post(optionalAuth, submitReport);
 
 // Public route to analyze image with AI
 router.route('/analyze').post(analyzeImage);
+
+// Public route to get ward stats
+router.route('/stats/ward').get(getWardStats);
 
 // Public route to get specific report, vote, comment, translate
 router.route('/:id').get(getReportById).delete(protect, deleteReport);

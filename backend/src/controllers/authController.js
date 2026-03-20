@@ -48,6 +48,7 @@ const registerUser = async (req, res) => {
                 role: user.role,
                 department: user.department,
                 ward: user.ward,
+                civicPoints: user.civicPoints,
                 token: generateToken(user._id),
             });
         } else {
@@ -77,6 +78,7 @@ const loginUser = async (req, res) => {
                 role: user.role,
                 department: user.department,
                 ward: user.ward,
+                civicPoints: user.civicPoints,
                 token: generateToken(user._id),
             });
         } else {
@@ -102,6 +104,7 @@ const getUserProfile = async (req, res) => {
                 role: user.role,
                 department: user.department,
                 ward: user.ward,
+                civicPoints: user.civicPoints,
             });
         } else {
             res.status(404).json({ message: 'User not found' });
@@ -135,6 +138,7 @@ const updateUserProfile = async (req, res) => {
                 role: updatedUser.role,
                 department: updatedUser.department,
                 ward: updatedUser.ward,
+                civicPoints: updatedUser.civicPoints,
                 token: generateToken(updatedUser._id),
             });
         } else {
@@ -237,6 +241,7 @@ const verifyOtp = async (req, res) => {
             role: user.role,
             department: user.department,
             ward: user.ward,
+            civicPoints: user.civicPoints,
             token: generateToken(user._id),
         });
 

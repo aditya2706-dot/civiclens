@@ -57,9 +57,14 @@ const authority = (req, res, next) => {
 };
 
 const adminOrAuthority = (req, res, next) => {
+    console.log("Checking adminOrAuthority middleware...");
+    console.log("req.user exists?", !!req.user);
+    if (req.user) console.log("req.user.role =", req.user.role);
+
     if (req.user && (req.user.role === 'admin' || req.user.role === 'authority')) {
         next();
     } else {
+        console.log("Failed adminOrAuthority check!");
         res.status(401).json({ message: 'Not authorized for this action' });
     }
 };

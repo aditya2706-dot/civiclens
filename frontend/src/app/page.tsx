@@ -15,6 +15,7 @@ import { motion } from "framer-motion";
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [unresolvedCount, setUnresolvedCount] = useState<number | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const { lang, setLang, t } = useLanguage();
 
   useEffect(() => {
@@ -29,7 +30,23 @@ export default function Home() {
         console.error("Failed to fetch reports for stats", error);
       }
     };
+    
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setUserProfile(res.data);
+        } catch (error) {
+          console.error("Failed to fetch profile", error);
+        }
+      }
+    };
+
     fetchStats();
+    fetchProfile();
   }, []);
 
   return (
@@ -43,6 +60,12 @@ export default function Home() {
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{t("tagline")}</p>
         </div>
         <div className="flex items-center gap-3">
+          {userProfile && (
+            <div className="flex flex-col items-end mr-1">
+              <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Points</span>
+              <span className="text-sm font-black text-green-600 leading-none">{userProfile.civicPoints || 0}</span>
+            </div>
+          )}
           {/* Language Toggle */}
           <button
             onClick={() => setLang(lang === "en" ? "hi" : "en")}

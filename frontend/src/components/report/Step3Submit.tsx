@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import { MessageCircle, Send, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import axios from "axios";
+import html2canvas from "html2canvas";
+import ShareCard from "../ShareCard";
 
 export function Step3Submit({
     onBack,
@@ -13,6 +15,8 @@ export function Step3Submit({
     const [isAnonymous, setIsAnonymous] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
+    const shareCardRef = useRef<HTMLDivElement>(null);
     const [isEditingLocation, setIsEditingLocation] = useState(false);
     const [manualAddress, setManualAddress] = useState("");
     const [selectedWard, setSelectedWard] = useState(data.aiAnalysis?.suggestedWard || "");
@@ -40,6 +44,15 @@ export function Step3Submit({
                 isAnonymous: isAnonymous
             };
 
+            if (!navigator.onLine) {
+                const pendingReports = JSON.parse(localStorage.getItem('pendingReports') || '[]');
+                pendingReports.push({ payload, headers, id: Date.now() });
+                localStorage.setItem('pendingReports', JSON.stringify(pendingReports));
+                setSubmitted(true);
+                setIsSubmitting(false);
+                return;
+            }
+
             const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports`, payload, { headers });
 
             if (res.data) {
@@ -53,10 +66,51 @@ export function Step3Submit({
         }
     };
 
-    const handleWhatsAppShare = () => {
-        const text = `*Civic Issue Reported*\nType: ${data.aiAnalysis?.suggestedCategory}\nSeverity: ${data.aiAnalysis?.computedSeverity}\nSummary: ${data.aiAnalysis?.summary}\nLat/Lng: ${data.location?.lat}, ${data.location?.lng}`;
-        const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-        window.open(url, '_blank');
+    const handleShare = async () => {
+        if (!shareCardRef.current) return;
+        setIsSharing(true);
+        try {
+            const canvas = await html2canvas(shareCardRef.current, {
+                useCORS: true,
+                allowTaint: true,
+                scale: 2 // High res
+            });
+            
+            canvas.toBlob(async (blob) => {
+                if (!blob) return;
+                const file = new File([blob], 'civic-report.png', { type: 'image/png' });
+                const text = `*Civic Issue Reported*\nType: ${data.aiAnalysis?.suggestedCategory}\nSeverity: ${data.aiAnalysis?.computedSeverity}\nSummary: ${data.aiAnalysis?.summary}\nLet's fix this together!`;
+                
+                try {
+                    // Test if browser supports file sharing natively
+                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            title: 'Civic Issue Reported',
+                            text: text,
+                            files: [file]
+                        });
+                    } else {
+                        // Fallback: Download image then open WhatsApp link automatically
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'civic-report.png';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        
+                        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    }
+                } catch (shareError: any) {
+                    if (shareError.name !== 'AbortError') {
+                        console.error('Share failed', shareError);
+                    }
+                }
+            }, 'image/png');
+        } catch (error) {
+            console.error("Error generating share card", error);
+        } finally {
+            setIsSharing(false);
+        }
     };
 
     if (submitted) {
@@ -78,12 +132,17 @@ export function Step3Submit({
                     <h3 className="font-semibold text-gray-700">Need Faster Action?</h3>
                     <p className="text-sm text-gray-500">Alert your local WhatsApp groups to increase visibility.</p>
                     <button
-                        onClick={handleWhatsAppShare}
-                        className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white py-3 rounded-xl font-bold hover:bg-[#1DA851] transition-colors"
+                        onClick={handleShare}
+                        disabled={isSharing}
+                        className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white py-3 rounded-xl font-bold hover:bg-[#1DA851] transition-colors disabled:opacity-50"
                     >
                         <MessageCircle size={20} />
-                        Forward to WhatsApp
+                        {isSharing ? "Generating Card..." : "Share with Community"}
                     </button>
+                </div>
+
+                <div className="absolute top-[-9999px] left-[-9999px]">
+                    <ShareCard data={data} ref={shareCardRef} />
                 </div>
 
                 <button

@@ -1,0 +1,18 @@
+{
+  "name": "CivicLens",
+  "short_name": "CivicLens",
+  "description": "Your City, Better.",
+  "theme_color": "#16a34a",
+  "background_color": "#f8fafc",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/globe.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

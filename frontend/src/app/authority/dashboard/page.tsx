@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { LogOut, MapPin, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { LogOut, MapPin, AlertTriangle, CheckCircle, Clock, FileText, CheckCircle2, Clock3 } from "lucide-react";
 import { motion } from "framer-motion";
 import NotificationBell from "@/components/NotificationBell";
+import Link from "next/link";
 
 export default function AuthorityDashboard() {
     const router = useRouter();
@@ -89,6 +90,10 @@ export default function AuthorityDashboard() {
         return <div className="min-h-screen flex items-center justify-center">Loading Authority Portal...</div>;
     }
 
+    const totalReports = reports.length;
+    const resolvedReports = reports.filter(r => r.status === 'Resolved').length;
+    const pendingReports = totalReports - resolvedReports;
+
     return (
         <main className="min-h-screen bg-gray-50 pb-28">
             {/* Header */}
@@ -121,9 +126,46 @@ export default function AuthorityDashboard() {
                 </div>
             </header>
 
+            {/* Stats Overview */}
+            <div className="max-w-3xl mx-auto px-4 mt-6">
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center mb-2">
+                            <FileText size={16} className="text-blue-500" />
+                        </div>
+                        <p className="text-2xl font-black text-gray-800 leading-none mb-1">{totalReports}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center">
+                        <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center mb-2">
+                            <Clock3 size={16} className="text-orange-500" />
+                        </div>
+                        <p className="text-2xl font-black text-gray-800 leading-none mb-1">{pendingReports}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pending</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center">
+                        <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center mb-2">
+                            <CheckCircle2 size={16} className="text-green-500" />
+                        </div>
+                        <p className="text-2xl font-black text-gray-800 leading-none mb-1">{resolvedReports}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Resolved</p>
+                    </div>
+                </div>
+
+                <div className="mt-4">
+                    <Link 
+                        href="/authority/route"
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-2xl py-4 font-black shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
+                    >
+                        <MapPin size={20} />
+                        Plan Today's Route
+                    </Link>
+                </div>
+            </div>
+
             {/* Reports List */}
-            <div className="max-w-3xl mx-auto p-4 mt-4 space-y-4">
-                <h2 className="text-xl font-bold text-gray-800 mb-4 px-2">Assigned Issues ({reports.length})</h2>
+            <div className="max-w-3xl mx-auto p-4 mt-2 space-y-4">
+                <h2 className="text-xl font-bold text-gray-800 mb-4 px-2">Assigned Issues</h2>
 
                 {reports.length === 0 ? (
                     <div className="bg-white rounded-3xl p-8 text-center border border-gray-100 shadow-sm">

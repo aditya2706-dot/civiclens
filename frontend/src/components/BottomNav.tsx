@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Map, FileText, BookOpen, Settings, Plus, Trophy } from "lucide-react";
+import { Map, FileText, BookOpen, BarChart2, Plus, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -17,7 +17,7 @@ export default function BottomNav() {
 
     const navItemsRight = [
         { labelKey: "navLeaderboard", href: "/leaderboard", icon: Trophy },
-        { labelKey: "navSettings", href: "/settings", icon: Settings },
+        { labelKey: "navStats", href: "/stats", icon: BarChart2 },
     ];
 
     const Item = ({ item }: { item: any }) => {

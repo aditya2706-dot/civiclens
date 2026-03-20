@@ -17,6 +17,7 @@ const translations = {
         navReport: "Report",
         navReports: "Reports",
         navLeaderboard: "Top",
+        navStats: "Stats",
         navSettings: "Account",
 
         // Category Filter
@@ -98,6 +99,7 @@ const translations = {
         navReport: "रिपोर्ट",
         navReports: "सूची",
         navLeaderboard: "शीर्ष",
+        navStats: "आंकड़े",
         navSettings: "खाता",
 
         // Category Filter
