@@ -10,14 +10,22 @@ import Link from "next/link";
 const CACHE_KEY = "civiclens_reports_cache";
 const CACHE_TTL = 60 * 1000; // 60 seconds
 
-function ReportSkeleton() {
+function FloatingLoader() {
     return (
-        <div className="bg-white rounded-[32px] p-2.5 border border-slate-100 overflow-hidden animate-pulse">
-            <div className="w-full h-52 rounded-[24px] bg-slate-200" />
-            <div className="pt-4 pb-2 px-3 space-y-2">
-                <div className="h-4 bg-slate-200 rounded-full w-3/4" />
-                <div className="h-3 bg-slate-100 rounded-full w-1/3" />
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="relative">
+                {/* Outer ring */}
+                <div className="w-16 h-16 rounded-full border-4 border-slate-100" />
+                {/* Spinning arc */}
+                <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-green-500 animate-spin" />
+                {/* Inner pulsing dot */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse" />
+                </div>
             </div>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+                Loading Reports...
+            </p>
         </div>
     );
 }
@@ -110,11 +118,7 @@ export default function MyReports() {
             {/* Reports List */}
             <div className="grid gap-6">
                 {loading ? (
-                    <>
-                        <ReportSkeleton />
-                        <ReportSkeleton />
-                        <ReportSkeleton />
-                    </>
+                    <FloatingLoader />
                 ) : (
                     <AnimatePresence>
                         {filteredReports.map((report) => (
@@ -136,38 +140,22 @@ export default function MyReports() {
                                                 (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80&w=600";
                                             }}
                                         />
-                                        <div className="absolute top-4 left-4">
-                                            <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-xl flex items-center gap-1.5">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                                                <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">
-                                                    {report.category}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="absolute bottom-4 left-4 right-4">
-                                             <div className="glass-effect p-3 rounded-2xl flex justify-between items-center shadow-2xl">
-                                                <div className="flex items-center gap-2 text-white">
-                                                    <MapPin size={12} className="text-green-400" />
-                                                    <span className="text-[10px] font-bold truncate max-w-[150px]">
-                                                        {report.location?.address?.split(',')[0] || "Live Location"}
-                                                    </span>
-                                                </div>
-                                                <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-wider ${
-                                                    report.status === 'Resolved' ? 'bg-green-500/90 text-white' : 
-                                                    report.status === 'Under Review' ? 'bg-yellow-500/90 text-white' : 'bg-red-500/90 text-white'
-                                                }`}>
-                                                    {report.status}
-                                                </span>
-                                             </div>
-                                        </div>
                                     </div>
 
                                     <div className="pt-4 pb-2 px-3">
-                                        <h3 className="font-extrabold text-slate-900 text-base leading-tight group-hover:text-green-700 transition-colors line-clamp-2 mb-1">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{report.category}</span>
+                                            <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                                                report.status === 'Resolved' ? 'bg-green-100 text-green-700' : 
+                                                report.status === 'Under Review' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
+                                            }`}>{report.status}</span>
+                                        </div>
+                                        <h3 className="font-extrabold text-slate-900 text-base leading-tight group-hover:text-green-700 transition-colors line-clamp-2 mb-1.5">
                                             {report.description || report.aiSummary || report.category + " Issue"}
                                         </h3>
-                                        <p className="text-[11px] text-slate-400 font-medium">
-                                            {report.createdAt ? new Date(report.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently Reported'}
+                                        <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                                            <MapPin size={10} className="text-slate-300" />
+                                            {report.location?.address?.split(',')[0] || "Live Location"} · {report.createdAt ? new Date(report.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently Reported'}
                                         </p>
                                     </div>
                                 </motion.div>
