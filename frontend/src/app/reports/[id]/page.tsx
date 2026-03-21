@@ -241,24 +241,21 @@ export default function ReportDetails() {
                 })()}
             </div>
 
-            {/* Report Title + Status — below the image, clean */}
+            {/* Report Category + Status row — clean, no duplicate description text */}
             <div className="px-6 pt-5 pb-2">
-                <div className="flex items-center gap-2 mb-3 flex-wrap">
-                    <span className="text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">
                         {report.category}
                     </span>
                     {report.ward && (
-                        <span className="text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+                        <span className="text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">
                             {report.ward}
                         </span>
                     )}
-                    <span className={`text-[11px] font-black px-3 py-1 rounded-full whitespace-nowrap shadow-sm ml-auto ${getStatusBadge(report.status)}`}>
+                    <span className={`text-[11px] font-black px-3 py-1.5 rounded-full whitespace-nowrap shadow-sm ml-auto ${getStatusBadge(report.status)}`}>
                         {report.status}
                     </span>
                 </div>
-                <h1 className="text-xl font-bold text-slate-900 leading-snug mb-1">
-                    {report.description || report.aiSummary || "Civic Issue"}
-                </h1>
             </div>
 
             <div className="px-6 space-y-6">
