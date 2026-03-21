@@ -196,7 +196,7 @@ export default function ReportDetails() {
 
     return (
         <main className="min-h-screen bg-gray-50 pb-28">
-            {/* Header with Image */}
+            {/* Header with Image - clean, no overlays */}
             <div className="relative h-72 w-full bg-black">
                 <button
                     onClick={() => router.back()}
@@ -207,36 +207,17 @@ export default function ReportDetails() {
                 <img
                     src={report.imageUrl || "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80"}
                     alt="Report Evidence"
-                    className="w-full h-full object-cover opacity-90"
+                    className="w-full h-full object-cover"
                     onError={(e) => {
                         (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80";
                     }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-
-                <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end">
-                    <div>
-                        <span className="bg-white/20 backdrop-blur text-white text-xs font-bold px-3 py-1 rounded-full mb-2 inline-block">
-                            {report.category}
-                        </span>
-                        {report.ward && (
-                            <span className="bg-white/20 backdrop-blur text-white text-xs font-bold px-3 py-1 rounded-full mb-2 inline-block ml-2">
-                                {report.ward}
-                            </span>
-                        )}
-                        <h1 className="text-2xl font-bold text-white leading-tight">{report.description || report.aiSummary || "Civic Issue"}</h1>
-                    </div>
-                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap shadow-lg ${getStatusBadge(report.status)}`}>
-                        {report.status}
-                    </span>
-                </div>
 
                 {/* Ownership Check for Deletion */}
                 {(() => {
                     const localUser = localStorage.getItem('user');
                     const currentUserId = localUser ? JSON.parse(localUser)._id : null;
                     
-                    // The report.userId might be an object (if populated) or a string ID
                     const reportOwnerId = report.userId?._id || report.userId;
                     const isOwner = currentUserId && reportOwnerId && String(reportOwnerId) === String(currentUserId);
                     
@@ -260,17 +241,37 @@ export default function ReportDetails() {
                 })()}
             </div>
 
-            <div className="p-6 space-y-6">
+            {/* Report Title + Status — below the image, clean */}
+            <div className="px-6 pt-5 pb-2">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    <span className="text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+                        {report.category}
+                    </span>
+                    {report.ward && (
+                        <span className="text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+                            {report.ward}
+                        </span>
+                    )}
+                    <span className={`text-[11px] font-black px-3 py-1 rounded-full whitespace-nowrap shadow-sm ml-auto ${getStatusBadge(report.status)}`}>
+                        {report.status}
+                    </span>
+                </div>
+                <h1 className="text-xl font-bold text-slate-900 leading-snug mb-1">
+                    {report.description || report.aiSummary || "Civic Issue"}
+                </h1>
+            </div>
+
+            <div className="px-6 space-y-6">
                 {/* Meta Info */}
-                <div className="flex justify-between items-center pb-6 border-b border-gray-200">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-                        <MapPin size={16} className="text-gray-400 shrink-0" />
+                <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                    <div className="flex items-center gap-2 text-sm text-gray-500 font-medium overflow-hidden">
+                        <MapPin size={14} className="text-gray-400 shrink-0" />
                         <span className="truncate">
                             {report.location?.address || `Lat: ${report.location?.lat?.toFixed(4)}, Lng: ${report.location?.lng?.toFixed(4)}`}
                         </span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 font-medium shrink-0">
-                        <Calendar size={16} className="text-gray-400" />
+                    <div className="flex items-center gap-2 text-sm text-gray-500 font-medium shrink-0">
+                        <Calendar size={14} className="text-gray-400" />
                         <span>{new Date(report.createdAt).toLocaleDateString()}</span>
                     </div>
                 </div>
