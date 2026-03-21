@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Calendar, ThumbsUp, ThumbsDown, CheckCircle2, Send, MessageCircle, ShieldCheck, Share2, Link as LinkIcon, Twitter, Phone, Languages, Trash2 } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, ThumbsUp, ThumbsDown, CheckCircle2, Send, MessageCircle, ShieldCheck, Share2, Link as LinkIcon, Twitter, Phone, Languages, Trash2, Info } from "lucide-react";
 import axios from "axios";
 
 export default function ReportDetails() {
@@ -208,6 +208,9 @@ export default function ReportDetails() {
                     src={report.imageUrl || "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80"}
                     alt="Report Evidence"
                     className="w-full h-full object-cover opacity-90"
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80";
+                    }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
 
@@ -221,7 +224,7 @@ export default function ReportDetails() {
                                 {report.ward}
                             </span>
                         )}
-                        <h1 className="text-2xl font-bold text-white leading-tight">{report.aiSummary || "Civic Issue"}</h1>
+                        <h1 className="text-2xl font-bold text-white leading-tight">{report.description || report.aiSummary || "Civic Issue"}</h1>
                     </div>
                     <span className={`text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap shadow-lg ${getStatusBadge(report.status)}`}>
                         {report.status}
@@ -271,6 +274,19 @@ export default function ReportDetails() {
                         <span>{new Date(report.createdAt).toLocaleDateString()}</span>
                     </div>
                 </div>
+
+                {/* User Description (New) */}
+                {report.description && (
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-3">
+                            <Info size={18} className="text-blue-500" />
+                            User Description
+                        </h3>
+                        <p className="text-gray-700 text-sm leading-relaxed">
+                            {report.description}
+                        </p>
+                    </div>
+                )}
 
                 {/* AI Summary Card */}
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">

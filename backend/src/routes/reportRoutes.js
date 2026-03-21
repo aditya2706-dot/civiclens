@@ -12,7 +12,8 @@ const {
     addComment,
     translateReport,
     deleteReport,
-    getWardStats
+    getWardStats,
+    getMapReports
 } = require('../controllers/reportController');
 const { protect, optionalAuth, admin, authority, adminOrAuthority } = require('../middlewares/authMiddleware');
 
@@ -24,6 +25,9 @@ router.route('/').get(getReports).post(optionalAuth, submitReport);
 
 // Public route to analyze image with AI
 router.route('/analyze').post(analyzeImage);
+
+// Public route to get lightweight data for map
+router.route('/map').get(getMapReports);
 
 // Public route to get ward stats
 router.route('/stats/ward').get(getWardStats);

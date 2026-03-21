@@ -18,7 +18,7 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const { lang, setLang, t } = useLanguage();
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchStats = async () => {
       try {
         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports`);
@@ -47,6 +47,11 @@ export default function Home() {
 
     fetchStats();
     fetchProfile();
+
+    // Poll for stats every 30 seconds
+    const statsInterval = setInterval(fetchStats, 30000);
+    
+    return () => clearInterval(statsInterval);
   }, []);
 
   return (

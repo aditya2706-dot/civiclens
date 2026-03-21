@@ -196,7 +196,7 @@ export default function AuthorityDashboard() {
                                 </div>
 
                                 <h3 className="text-lg font-bold text-gray-900 mb-1 capitalize">{report.category}</h3>
-                                <p className="text-sm text-gray-600 line-clamp-2 mb-3 flex-1">{report.aiSummary}</p>
+                                <p className="text-sm text-gray-600 line-clamp-2 mb-3 flex-1">{report.description || report.aiSummary}</p>
 
                                 <div className="flex items-center text-xs text-gray-500 font-medium mb-4 gap-4">
                                     <span className="flex items-center gap-1"><MapPin size={14} /> {report.ward || "Unknown Area"}</span>

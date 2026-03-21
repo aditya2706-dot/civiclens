@@ -20,6 +20,7 @@ export function Step3Submit({
     const [isEditingLocation, setIsEditingLocation] = useState(false);
     const [manualAddress, setManualAddress] = useState("");
     const [selectedWard, setSelectedWard] = useState(data.aiAnalysis?.suggestedWard || "");
+    const [description, setDescription] = useState("");
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
@@ -36,6 +37,7 @@ export function Step3Submit({
             const payload = {
                 imageUrl: data.base64Image || data.imageUrl,
                 category: data.aiAnalysis?.suggestedCategory || 'Other',
+                description: description,
                 aiSummary: data.aiAnalysis?.summary || '',
                 detectedObjects: data.aiAnalysis?.detectedObjects || [],
                 severity: data.aiAnalysis?.computedSeverity || 'Medium',
@@ -209,6 +211,16 @@ export function Step3Submit({
                             className="text-sm border border-gray-200 rounded-lg bg-white p-2 text-right font-medium text-gray-700 outline-none focus:border-green-500 w-48"
                         />
                     </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100">
+                    <label className="text-sm font-semibold text-gray-700 ml-1 mb-2 block">Tell us more details (Optional)</label>
+                    <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="e.g. This waste is blocking the entrance to the park..."
+                        className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-700 focus:ring-2 focus:ring-green-500 outline-none min-h-[100px] resize-none"
+                    />
                 </div>
 
                 <div className="pt-4 border-t border-gray-100">

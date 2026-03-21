@@ -5,6 +5,21 @@ const { analyzeImageGemini, getDepartmentForCategory, translateText } = require(
 const axios = require('axios');
 const { getWardFromCoordinates } = require('../utils/wardDetector');
 
+// Simple in-memory cache to reduce repeated DB queries
+const _cache = {};
+function getCache(key) {
+    const item = _cache[key];
+    if (item && Date.now() - item.ts < item.ttl) return item.data;
+    return null;
+}
+function setCache(key, data, ttlMs) {
+    _cache[key] = { data, ts: Date.now(), ttl: ttlMs };
+}
+// Invalidate cache when new report is submitted
+function clearCache() {
+    Object.keys(_cache).forEach(k => delete _cache[k]);
+}
+
 // @desc    Analyze uploaded image with Gemini
 // @route   POST /api/reports/analyze
 // @access  Public
@@ -44,7 +59,8 @@ const submitReport = async (req, res) => {
         const reportData = {
             imageUrl,
             category: category,
-            aiSummary: description ? `${description} | AI: ${aiSummary}` : aiSummary,
+            description: description,
+            aiSummary: aiSummary,
             detectedObjects: detectedObjects,
             severity: severity,
             location,
@@ -59,6 +75,8 @@ const submitReport = async (req, res) => {
         }
 
         const report = await Report.create(reportData);
+        // Invalidate cache so the new report appears immediately
+        clearCache();
 
         // Feature: Push Notifications for High Severity
         if (severity === 'High' && department) {
@@ -87,14 +105,22 @@ const submitReport = async (req, res) => {
 // @access  Public
 const getReports = async (req, res) => {
     try {
-        const { status, category } = req.query;
-        let query = {};
-
-        if (status) query.status = status;
-        if (category) query.category = category;
-
-        const reports = await Report.find(query).sort({ createdAt: -1 });
-        res.json(reports);
+        const cached = getCache('reports_list');
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=15');
+            return res.json(cached);
+        }
+        const reports = await Report.find({})
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean();
+        const sanitizedReports = reports.map(r => ({
+            ...r,
+            imageUrl: (r.imageUrl && r.imageUrl.includes('example.com')) ? null : r.imageUrl
+        }));
+        setCache('reports_list', sanitizedReports, 15000);
+        res.set('Cache-Control', 'public, max-age=15');
+        res.json(sanitizedReports);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching reports', error: error.message });
     }
@@ -116,8 +142,15 @@ const getAuthorityReports = async (req, res) => {
 
         if (status) query.status = status;
 
-        const reports = await Report.find(query).sort({ createdAt: -1 });
-        res.json(reports);
+        const reports = await Report.find(query)
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean();
+        const sanitizedReports = reports.map(r => ({
+            ...r,
+            imageUrl: (r.imageUrl && r.imageUrl.includes('example.com')) ? null : r.imageUrl
+        }));
+        res.json(sanitizedReports);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching authority reports', error: error.message });
     }
@@ -175,7 +208,10 @@ const getReportById = async (req, res) => {
             .populate('userId', 'name')
             .populate('comments.user', 'name role department');
         if (report) {
-            res.json(report);
+            if (report.imageUrl && report.imageUrl.includes('example.com')) {
+            report.imageUrl = null;
+        }
+        res.json(report);
         } else {
             res.status(404).json({ message: 'Report not found' });
         }
@@ -310,11 +346,50 @@ const addComment = async (req, res) => {
     }
 };
 
+// @desc    Get minimal report data for map markers
+// @route   GET /api/reports/map
+// @access  Public
+async function getMapReports(req, res) {
+    try {
+        const { status, category, ward } = req.query;
+        let query = {};
+
+        if (status) query.status = status;
+        if (category && category !== 'All') query.category = category;
+        if (ward && ward !== 'All Wards') query.ward = ward;
+
+        const cacheKey = `map_${status}_${category}_${ward}`;
+        const cached = getCache(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=10');
+            return res.json(cached);
+        }
+
+        const reports = await Report.find(query)
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .select('location status category severity ward imageUrl description aiSummary')
+            .lean(); 
+            
+        const sanitizedReports = reports.map(r => ({
+            ...r,
+            imageUrl: (r.imageUrl && r.imageUrl.includes('example.com')) ? null : r.imageUrl
+        }));
+        
+        setCache(cacheKey, sanitizedReports, 10000);
+        res.set('Cache-Control', 'public, max-age=10');
+        res.json(sanitizedReports);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching map reports', error: error.message });
+    }
+}
+
 module.exports = {
     analyzeImage,
     submitReport,
     getReports,
     getAuthorityReports,
+    getMapReports,
     getReportById,
     updateReportStatus,
     verifyReport,

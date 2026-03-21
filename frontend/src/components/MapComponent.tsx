@@ -20,6 +20,9 @@ L.Icon.Default.mergeOptions({
 
 import axios from "axios";
 
+const MAP_CACHE_KEY = "civiclens_map_cache";
+const MAP_CACHE_TTL = 30 * 1000; // 30 seconds
+
 function MapCenterUpdater({ center }: { center: [number, number] }) {
     const map = useMap();
     useEffect(() => {
@@ -38,19 +41,40 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
     const router = useRouter();
 
     useEffect(() => {
+        // Load cached map data instantly
+        try {
+            const cacheKey = `${MAP_CACHE_KEY}_${selectedCategory}_${selectedWard}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const { data, ts } = JSON.parse(cached);
+                if (Date.now() - ts < MAP_CACHE_TTL && Array.isArray(data)) {
+                    setReports(data);
+                }
+            }
+        } catch (_) {}
+
         const fetchReports = async () => {
             try {
-                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports`);
+                const cacheKey = `${MAP_CACHE_KEY}_${selectedCategory}_${selectedWard}`;
+                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/map`, {
+                    params: { category: selectedCategory, ward: selectedWard }
+                });
                 if (Array.isArray(res.data)) {
                     setReports(res.data);
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ data: res.data, ts: Date.now() }));
+                    } catch (_) {}
                 }
             } catch (err) {
-                console.error("Failed to fetch reports:", err);
+                console.error("Failed to fetch map reports:", err);
             }
         };
         fetchReports();
+        
+        // Poll for updates every 10 seconds
+        const interval = setInterval(fetchReports, 10000);
 
-        // Get user location
+        // Get user location (non-blocking)
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -59,10 +83,12 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
                 (error) => {
                     console.warn("Could not get exact location, using default.", error.message);
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
             );
         }
-    }, []);
+
+        return () => clearInterval(interval);
+    }, [selectedCategory, selectedWard]);
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -185,37 +211,44 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 50 }}
-                        className="absolute bottom-6 left-4 right-4 bg-white p-4 rounded-3xl shadow-2xl z-[1000]"
+                        className="absolute bottom-6 left-4 right-4 bg-white p-4 rounded-[32px] shadow-2xl z-[1000] border border-slate-100 flex flex-col gap-4"
                     >
-                        <div className="flex justify-between items-start mb-2">
-                            <div>
-                                <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full ${getStatusColor(selectedReport.status)}`}>
-                                    {selectedReport.status}
-                                </span>
-                                {selectedReport.upvoteCount > 0 && (
-                                    <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-1 rounded-full">
-                                        👍 {selectedReport.upvoteCount} Let authorities know
+                        <div className="flex gap-4">
+                            {selectedReport.imageUrl && (
+                                <div className="w-20 h-20 rounded-[24px] overflow-hidden shrink-0 shadow-inner">
+                                    <img 
+                                        src={selectedReport.imageUrl} 
+                                        alt="Issue" 
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                            )}
+                            <div className="flex-1">
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className={`text-[9px] uppercase tracking-wider font-extrabold px-2 py-1 rounded-lg ${getStatusColor(selectedReport.status)} shadow-sm`}>
+                                        {selectedReport.status}
                                     </span>
-                                )}
+                                    <button
+                                        onClick={() => setSelectedReport(null)}
+                                        className="text-slate-300 hover:text-slate-400 transition-colors"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                                <h3 className="font-bold text-slate-900 text-sm line-clamp-2 leading-tight mb-2">
+                                    {selectedReport.description || selectedReport.aiSummary || `${selectedReport.category} Issue`}
+                                </h3>
+                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold">
+                                    <MapPin size={10} className="text-blue-500" /> 
+                                    <span className="truncate">{selectedReport.location?.address?.split(',')[0] || "Live Location"}</span>
+                                </div>
                             </div>
-                            <button
-                                onClick={() => setSelectedReport(null)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 shrink-0"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                        <h3 className="font-bold text-gray-900 mt-2 line-clamp-2">{selectedReport.aiSummary || `${selectedReport.category} Issue`}</h3>
-                        <div className="flex items-center justify-between mt-2 gap-2">
-                            <p className="text-sm text-gray-500 flex items-center gap-1">
-                                <MapPin size={14} /> {selectedReport.location?.address?.substring(0, 30) || `Lat: ${selectedReport.location?.lat?.toFixed(4)}, Lng: ${selectedReport.location?.lng?.toFixed(4)}`}...
-                            </p>
                         </div>
                         <button
                             onClick={() => router.push(`/reports/${selectedReport._id}`)}
-                            className="w-full mt-4 bg-green-50 text-green-700 font-semibold py-3 rounded-xl hover:bg-green-100 transition-colors"
+                            className="w-full bg-blue-50 text-blue-600 font-extrabold py-3 rounded-2xl hover:bg-blue-100 transition-all flex items-center justify-center gap-2 text-xs shadow-sm"
                         >
-                            View Details
+                            View Full Report Details
                         </button>
                     </motion.div>
                 )}
