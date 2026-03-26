@@ -17,6 +17,7 @@ export default function ReportDetails() {
     const [translatedText, setTranslatedText] = useState<string | null>(null);
     const [translating, setTranslating] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isOwner, setIsOwner] = useState(false);
 
     const handleDelete = async () => {
         if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
@@ -45,6 +46,11 @@ export default function ReportDetails() {
                 const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}`);
                 if (res.data && res.data._id) {
                     setReport(res.data);
+                    
+                    const localUser = localStorage.getItem('user');
+                    const currentUserId = localUser ? JSON.parse(localUser)._id : null;
+                    const reportOwnerId = res.data.userId?._id || res.data.userId;
+                    setIsOwner(!!(currentUserId && reportOwnerId && String(reportOwnerId) === String(currentUserId)));
                 }
             } catch (err) {
                 console.error("Failed to fetch report details:", err);
@@ -195,14 +201,14 @@ export default function ReportDetails() {
     };
 
     return (
-        <main className="min-h-screen bg-gray-50 pb-28">
-            {/* Header with Image - clean, no overlays */}
-            <div className="relative h-72 w-full bg-black">
+        <main className="min-h-screen bg-white pb-28">
+            {/* Immersive Edge-to-Edge Hero Imagery */}
+            <div className="relative h-80 md:h-[28rem] w-full bg-slate-900 rounded-b-[3rem] overflow-hidden shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] z-0">
                 <button
                     onClick={() => router.back()}
-                    className="absolute top-6 left-6 z-10 w-10 h-10 bg-black/30 backdrop-blur rounded-full flex items-center justify-center text-white"
+                    className="absolute top-6 left-6 z-10 w-12 h-12 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-white/30 shadow-lg hover:bg-white/30 transition-all"
                 >
-                    <ArrowLeft size={20} />
+                    <ArrowLeft size={20} className="drop-shadow-md" />
                 </button>
                 <img
                     src={report.imageUrl || "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80"}
@@ -212,77 +218,92 @@ export default function ReportDetails() {
                         (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1605808360022-d7b38d38865f?auto=format&fit=crop&q=80";
                     }}
                 />
+                
+                {/* Embedded Image Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
 
                 {/* Ownership Check for Deletion */}
-                {(() => {
-                    const localUser = localStorage.getItem('user');
-                    const currentUserId = localUser ? JSON.parse(localUser)._id : null;
-                    
-                    const reportOwnerId = report.userId?._id || report.userId;
-                    const isOwner = currentUserId && reportOwnerId && String(reportOwnerId) === String(currentUserId);
-                    
-                    if (isOwner) {
-                        return (
-                            <button
-                                onClick={handleDelete}
-                                disabled={isDeleting}
-                                className="absolute top-6 right-6 z-10 w-10 h-10 bg-red-500/80 backdrop-blur rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors shadow-lg"
-                                title="Delete Report"
-                            >
-                                {isDeleting ? (
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                    <Trash2 size={18} />
-                                )}
-                            </button>
-                        );
-                    }
-                    return null;
-                })()}
+                {isOwner && (
+                    <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="absolute top-6 right-6 z-10 w-12 h-12 bg-red-500/80 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-red-400 hover:bg-red-600 transition-all shadow-lg hidden print:hidden"
+                        title="Delete Report"
+                    >
+                        {isDeleting ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Trash2 size={18} className="drop-shadow-md" />
+                        )}
+                    </button>
+                )}
             </div>
 
             {/* Report Category + Status row — clean, no duplicate description text */}
-            <div className="px-6 pt-5 pb-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">
-                        {report.category}
-                    </span>
-                    {report.ward && (
-                        <span className="text-[11px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">
-                            {report.ward}
+            <div className="px-6 pt-6 pb-2 relative z-10 text-center md:text-left">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div className="flex gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+                            {report.category}
                         </span>
-                    )}
-                    <span className={`text-[11px] font-black px-3 py-1.5 rounded-full whitespace-nowrap shadow-sm ml-auto ${getStatusBadge(report.status)}`}>
+                        {report.ward && (
+                            <span className="text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+                                {report.ward}
+                            </span>
+                        )}
+                    </div>
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm ml-auto ${getStatusBadge(report.status)} bg-opacity-10 text-opacity-100 border`}>
                         {report.status}
                     </span>
                 </div>
             </div>
 
-            <div className="px-6 space-y-6">
+            <div className="px-6 space-y-6 max-w-2xl mx-auto">
                 {/* Meta Info */}
-                <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                    <div className="flex items-center gap-2 text-sm text-gray-500 font-medium overflow-hidden">
-                        <MapPin size={14} className="text-gray-400 shrink-0" />
+                <div className="flex justify-between items-center pb-6 border-b border-slate-100">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-wider overflow-hidden">
+                        <MapPin size={14} className="shrink-0" />
                         <span className="truncate">
                             {report.location?.address || `Lat: ${report.location?.lat?.toFixed(4)}, Lng: ${report.location?.lng?.toFixed(4)}`}
                         </span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 font-medium shrink-0">
-                        <Calendar size={14} className="text-gray-400" />
+                    <div className="flex items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-wider shrink-0">
+                        <Calendar size={14} />
                         <span>{new Date(report.createdAt).toLocaleDateString()}</span>
                     </div>
                 </div>
 
-                {/* User Description (New) */}
+                {/* User Description */}
                 {report.description && (
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                        <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-3">
-                            <Info size={18} className="text-blue-500" />
-                            User Description
+                    <div className="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] border border-slate-100/60">
+                        <h3 className="font-black text-slate-800 flex items-center gap-2 mb-3 tracking-snug">
+                            <Info size={16} className="text-blue-500" />
+                            Incident Context
                         </h3>
-                        <p className="text-gray-700 text-sm leading-relaxed">
+                        <p className="text-slate-600 text-sm font-medium leading-relaxed">
                             {report.description}
                         </p>
+                    </div>
+                )}
+
+                {/* OTP Verification Card (Apple Pay Aesthetic) */}
+                {isOwner && report.status !== "Resolved" && report.resolutionOTP && (
+                    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-black rounded-[2rem] p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] border border-slate-700 text-white relative overflow-hidden mt-8">
+                        {/* Glow Effect */}
+                        <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl" />
+                        
+                        <div className="flex items-center gap-3 mb-3 relative z-10">
+                            <ShieldCheck size={28} className="text-emerald-400" />
+                            <h3 className="font-black text-xl tracking-tight">Security PIN</h3>
+                        </div>
+                        <p className="text-slate-400 text-sm font-medium mb-6 leading-snug relative z-10 pr-6">
+                            Provide this code to the authorized worker <strong className="text-white">only</strong> when they physically resolve the issue.
+                        </p>
+                        <div className="bg-white/10 rounded-[1.5rem] p-5 flex justify-center items-center backdrop-blur-md border border-white/20 relative z-10 shadow-inner">
+                            <span className="font-mono text-5xl font-black tracking-[0.5em] ml-[0.25em] text-emerald-300 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]">
+                                {report.resolutionOTP}
+                            </span>
+                        </div>
                     </div>
                 )}
 
@@ -444,7 +465,7 @@ export default function ReportDetails() {
                                 <div key={idx} className={`flex flex-col ${comment.isAuthority ? 'items-end' : 'items-start'}`}>
                                     <div className={`max-w-[85%] rounded-2xl p-4 shadow-sm relative ${
                                         comment.isAuthority 
-                                            ? 'bg-blue-50 border border-blue-100 rounded-br-sm' 
+                                            ? 'bg-green-50 border border-green-200 rounded-br-sm' 
                                             : 'bg-gray-50 border border-gray-100 rounded-bl-sm'
                                     }`}>
                                         <div className="flex items-center gap-2 mb-1">
@@ -452,8 +473,8 @@ export default function ReportDetails() {
                                                 {comment.user?.name || 'Citizen'}
                                             </span>
                                             {comment.isAuthority && (
-                                                <span className="bg-blue-600 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                                                    <ShieldCheck size={10} /> Official
+                                                <span className="bg-green-600 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ml-2">
+                                                    <ShieldCheck size={10} /> Verified Authority
                                                 </span>
                                             )}
                                         </div>

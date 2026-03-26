@@ -4,6 +4,7 @@ const {
     analyzeImage,
     submitReport,
     getReports,
+    getMyReports,
     getAuthorityReports,
     getReportById,
     updateReportStatus,
@@ -13,12 +14,17 @@ const {
     translateReport,
     deleteReport,
     getWardStats,
-    getMapReports
+    getReportsStats,
+    getMapReports,
+    transferReport
 } = require('../controllers/reportController');
 const { protect, optionalAuth, admin, authority, adminOrAuthority } = require('../middlewares/authMiddleware');
 
 // Authority route to get their assigned reports
 router.route('/authority').get(protect, adminOrAuthority, getAuthorityReports);
+
+// Citizen route to get their own reports
+router.route('/my').get(protect, getMyReports);
 
 // Public route to get reports and submit (optionally authenticated)
 router.route('/').get(getReports).post(optionalAuth, submitReport);
@@ -30,6 +36,7 @@ router.route('/analyze').post(analyzeImage);
 router.route('/map').get(getMapReports);
 
 // Public route to get ward stats
+router.route('/stats').get(getReportsStats);
 router.route('/stats/ward').get(getWardStats);
 
 // Public route to get specific report, vote, comment, translate
@@ -41,6 +48,7 @@ router.route('/:id/translate').post(translateReport);
 
 // Admin/Authority route to update status
 router.route('/:id/status').put(protect, adminOrAuthority, updateReportStatus);
+router.route('/:id/transfer').put(protect, adminOrAuthority, transferReport);
 
 // Auth route to submit report as user (optional depending on frontend implementation, can just use the public one and pass JWT)
 

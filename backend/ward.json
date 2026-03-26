@@ -1,0 +1,44 @@
+{
+  "type": "Feature",
+  "properties": {
+    "ward_no": 64,
+    "ward_name": "Power House - Nangla Samawadi - Tijara Road Area"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [76.6800, 27.5850],  
+        [76.7000, 27.5850],  
+        [76.7050, 27.5750],  
+        [76.7000, 27.5600],  
+        [76.6850, 27.5550],  
+        [76.6750, 27.5650],  
+        [76.6750, 27.5750],  
+        [76.6800, 27.5850]   
+      ]
+    ]
+  }
+}
+{
+  "type": "Feature",
+  "properties": {
+    "ward_no": 65,
+    "ward_name": "Behror Road - Hasan Khan Mewat Nagar Area"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [76.6650, 27.5850],  
+        [76.6850, 27.5850],  
+        [76.6900, 27.5750],  
+        [76.6880, 27.5600],  
+        [76.6700, 27.5600],  
+        [76.6600, 27.5700],  
+        [76.6620, 27.5800],  
+        [76.6650, 27.5850]   
+      ]
+    ]
+  }
+}

@@ -24,6 +24,21 @@ const reportSchema = new mongoose.Schema({
     aiSummary: {
         type: String,
     },
+    estimatedCost: {
+        type: Number,
+    },
+    estimatedResources: {
+        type: String,
+    },
+    isDuplicateOf: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Report',
+        default: null
+    },
+    duplicateCount: {
+        type: Number,
+        default: 0
+    },
     detectedObjects: [{
         type: String,
     }],
@@ -39,8 +54,18 @@ const reportSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['Pending', 'Under Review', 'Resolved'],
+        enum: ['Pending', 'Under Review', 'In Progress', 'Resolved'],
         default: 'Pending',
+    },
+    deadline: {
+        type: Date,
+    },
+    isEscalated: {
+        type: Boolean,
+        default: false,
+    },
+    resolutionOTP: {
+        type: String,
     },
     upvotedBy: [{
         type: mongoose.Schema.Types.ObjectId,
@@ -67,5 +92,11 @@ const reportSchema = new mongoose.Schema({
         createdAt: { type: Date, default: Date.now }
     }]
 }, { timestamps: true });
+
+// Performance Indexes for high-frequency queries and dashboard polling
+reportSchema.index({ isDuplicateOf: 1, createdAt: -1 });
+reportSchema.index({ status: 1, createdAt: -1 });
+reportSchema.index({ department: 1, ward: 1 });
+reportSchema.index({ category: 1, status: 1 });
 
 module.exports = mongoose.model('Report', reportSchema);

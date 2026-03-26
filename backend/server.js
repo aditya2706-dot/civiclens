@@ -9,7 +9,12 @@ const PORT = process.env.PORT || 5001;
 // Middleware
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin || origin.includes('vercel.app') || origin.includes('localhost') || origin === process.env.FRONTEND_URL) {
+        if (!origin || 
+            origin.includes('vercel.app') || 
+            origin.includes('localhost') || 
+            origin.includes('127.0.0.1') || 
+            origin.includes('192.168.') || 
+            origin === process.env.FRONTEND_URL) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -25,6 +30,7 @@ app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/reports', require('./src/routes/reportRoutes'));
 app.use('/api/blogs', require('./src/routes/blogRoutes'));
 app.use('/api/notifications', require('./src/routes/notificationRoutes'));
+app.use('/api/broadcasts', require('./src/routes/broadcastRoutes'));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI)

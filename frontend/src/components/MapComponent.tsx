@@ -36,6 +36,8 @@ function MapCenterUpdater({ center }: { center: [number, number] }) {
 export default function MapComponent({ selectedCategory, selectedWard }: { selectedCategory: string, selectedWard: string }) {
     const [reports, setReports] = useState<any[]>([]);
     const [selectedReport, setSelectedReport] = useState<any>(null);
+    const [selectedReportDetails, setSelectedReportDetails] = useState<any>(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
     const [mapCenter, setMapCenter] = useState<[number, number]>([28.6139, 77.2090]); // Default to New Delhi
     const [isHeatmapMode, setIsHeatmapMode] = useState(false);
     const router = useRouter();
@@ -71,8 +73,8 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
         };
         fetchReports();
         
-        // Poll for updates every 10 seconds
-        const interval = setInterval(fetchReports, 10000);
+        // Poll for updates every 20 seconds (reduced frequency due to better caching)
+        const interval = setInterval(fetchReports, 20000);
 
         // Get user location (non-blocking)
         if (navigator.geolocation) {
@@ -104,15 +106,27 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
     };
 
     const getMarkerIcon = (status: string) => {
-        let color = 'EF4444'; // Red for Unsolved/Rejected
-        if (status === 'Ongoing' || status === 'Under Review') color = 'EAB308'; // Yellow for Ongoing
-        if (status === 'Solved' || status === 'Resolved') color = '22C55E'; // Green for Solved
+        let color = 'FF3B30'; // Apple-style Red
+        if (status === 'Ongoing' || status === 'Under Review') color = 'FFCC00'; // Apple-style Yellow
+        if (status === 'Solved' || status === 'Resolved') color = '34C759'; // Apple-style Green
 
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#${color}" stroke="#ffffff" stroke-width="3" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.2));"/></svg>`;
+        const svg = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" fill="white" />
+                <circle cx="12" cy="12" r="8" fill="#${color}" />
+                <circle cx="12" cy="12" r="8" fill="url(#paint0_radial)" fill-opacity="0.3"/>
+                <defs>
+                    <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" transform="translate(12 12) rotate(90) scale(8)">
+                        <stop stop-color="white" stop-opacity="0.5"/>
+                        <stop offset="1" stop-color="white" stop-opacity="0"/>
+                    </radialGradient>
+                </defs>
+            </svg>
+        `;
 
         return L.divIcon({
             className: 'custom-leaflet-icon',
-            html: svg,
+            html: `<div class="drop-shadow-md hover:scale-125 transition-transform duration-300">${svg}</div>`,
             iconSize: [24, 24],
             iconAnchor: [12, 12]
         });
@@ -184,7 +198,19 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
                                     position={[report.location.lat, report.location.lng]}
                                     icon={getMarkerIcon(report.status)}
                                     eventHandlers={{
-                                        click: () => setSelectedReport(report),
+                                        click: async () => {
+                                            setSelectedReport(report);
+                                            setLoadingDetails(true);
+                                            setSelectedReportDetails(null);
+                                            try {
+                                                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/${report._id}`);
+                                                setSelectedReportDetails(res.data);
+                                            } catch (err) {
+                                                console.error("Failed to fetch report details:", err);
+                                            } finally {
+                                                setLoadingDetails(false);
+                                            }
+                                        },
                                     }}
                                 />
                             ) : null
@@ -211,37 +237,51 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 50 }}
-                        className="absolute bottom-6 left-4 right-4 bg-white p-4 rounded-[32px] shadow-2xl z-[1000] border border-slate-100 flex flex-col gap-4"
+                        className="absolute bottom-6 left-4 right-4 bg-white/90 backdrop-blur-2xl p-4 rounded-[32px] shadow-2xl z-[1000] border border-white/50 flex flex-col gap-4"
                     >
                         <div className="flex gap-4">
-                            {selectedReport.imageUrl && (
-                                <div className="w-20 h-20 rounded-[24px] overflow-hidden shrink-0 shadow-inner">
+                            {loadingDetails ? (
+                                <div className="w-20 h-20 rounded-[24px] bg-slate-100 animate-pulse shrink-0" />
+                            ) : (selectedReportDetails?.imageUrl || selectedReport.imageUrl) && (
+                                <div className="w-20 h-20 rounded-[24px] overflow-hidden shrink-0 shadow-lg border-2 border-white">
                                     <img 
-                                        src={selectedReport.imageUrl} 
+                                        src={selectedReportDetails?.imageUrl || selectedReport.imageUrl} 
                                         alt="Issue" 
                                         className="w-full h-full object-cover"
                                     />
                                 </div>
                             )}
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className={`text-[9px] uppercase tracking-wider font-extrabold px-2 py-1 rounded-lg ${getStatusColor(selectedReport.status)} shadow-sm`}>
+                                    <span className={`text-[9px] uppercase tracking-widest font-black px-2.5 py-1 rounded-full ${getStatusColor(selectedReport.status)} shadow-sm`}>
                                         {selectedReport.status}
                                     </span>
                                     <button
-                                        onClick={() => setSelectedReport(null)}
-                                        className="text-slate-300 hover:text-slate-400 transition-colors"
+                                        onClick={() => {
+                                            setSelectedReport(null);
+                                            setSelectedReportDetails(null);
+                                        }}
+                                        className="w-6 h-6 flex items-center justify-center bg-slate-100 text-slate-400 rounded-full hover:bg-slate-200 transition-colors"
                                     >
                                         ✕
                                     </button>
                                 </div>
-                                <h3 className="font-bold text-slate-900 text-sm line-clamp-2 leading-tight mb-2">
-                                    {selectedReport.description || selectedReport.aiSummary || `${selectedReport.category} Issue`}
-                                </h3>
-                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold">
-                                    <MapPin size={10} className="text-blue-500" /> 
-                                    <span className="truncate">{selectedReport.location?.address?.split(',')[0] || "Live Location"}</span>
-                                </div>
+                                {loadingDetails ? (
+                                    <div className="space-y-2 mt-2">
+                                        <div className="h-4 bg-slate-100 animate-pulse rounded w-3/4" />
+                                        <div className="h-3 bg-slate-100 animate-pulse rounded w-1/2" />
+                                    </div>
+                                ) : (
+                                    <>
+                                        <h3 className="font-black text-slate-900 text-sm line-clamp-2 leading-tight mb-2 tracking-tight">
+                                            {selectedReportDetails?.description || selectedReportDetails?.aiSummary || `${selectedReport.category} Issue`}
+                                        </h3>
+                                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                            <span className="truncate">{selectedReportDetails?.location?.address?.split(',')[0] || "Active Scene"}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                         <button

@@ -6,6 +6,7 @@ import { MapPin, Search, Calendar } from "lucide-react";
 import axios from "axios";
 import FilterBar from "@/components/FilterBar";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const CACHE_KEY = "civiclens_reports_cache";
 const CACHE_TTL = 60 * 1000; // 60 seconds
@@ -35,6 +36,7 @@ export default function MyReports() {
     const [filter, setFilter] = useState("All");
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         // 1. Show cached data instantly
@@ -52,7 +54,14 @@ export default function MyReports() {
         // 2. Always fetch fresh in background
         const fetchReports = async () => {
             try {
-                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports`);
+                const token = localStorage.getItem("token");
+                if (!token) {
+                    router.push("/login");
+                    return;
+                }
+                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/my`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 if (Array.isArray(res.data)) {
                     setReports(res.data);
                     setLoading(false);
@@ -61,8 +70,9 @@ export default function MyReports() {
                     } catch (_) {}
                 }
             } catch (err) {
-                console.error("Failed to fetch reports:", err);
+                console.error("Failed to fetch personal reports:", err);
                 setLoading(false);
+                router.push("/login");
             }
         };
         fetchReports();
@@ -97,8 +107,8 @@ export default function MyReports() {
         <main className="min-h-screen bg-slate-50 flex flex-col pt-12 px-5 pb-32">
             <header className="mb-8 flex justify-between items-end">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Discover</h1>
-                    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-1">Community Feed</p>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">My Reports</h1>
+                    <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-1">Your Civic Submissions</p>
                 </div>
                 <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
                     <Calendar size={18} className="text-slate-400" />

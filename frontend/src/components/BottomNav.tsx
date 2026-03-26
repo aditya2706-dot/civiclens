@@ -2,23 +2,57 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Map, FileText, BookOpen, BarChart2, Plus, Trophy } from "lucide-react";
+import { Map, FileText, BookOpen, BarChart2, Plus, Trophy, Navigation } from "lucide-react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 
 export default function BottomNav() {
     const pathname = usePathname();
     const { t } = useLanguage();
+    const [role, setRole] = [useState<string | null>(null), null]; // Mocking for hook rules, will use real hooks below
+    
+    // Using actual state and effects for role detection
+    const [userRole, setUserRole] = useState<string | null>(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-    const navItems = [
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            setIsLoggedIn(true);
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                setUserRole(payload.role);
+            } catch (e) {
+                console.error("Failed to parse token for role", e);
+            }
+        }
+    }, [pathname]);
+
+    const isAuthority = userRole === 'authority' || userRole === 'admin';
+
+    const citizenItems = [
         { labelKey: "navMap", href: "/", icon: Map },
-        { labelKey: "navReports", href: "/reports", icon: FileText },
+        ...(isLoggedIn ? [{ labelKey: "navReports", href: "/reports", icon: FileText }] : []),
     ];
 
-    const navItemsRight = [
+    const citizenItemsRight = [
         { labelKey: "navLeaderboard", href: "/leaderboard", icon: Trophy },
         { labelKey: "navStats", href: "/stats", icon: BarChart2 },
     ];
+
+    const authorityItems = [
+        { labelKey: "Dashboard", href: "/authority/dashboard", icon: FileText, label: "Issues" },
+        { labelKey: "Map", href: "/", icon: Map, label: "Map" },
+    ];
+
+    const authorityItemsRight = [
+        { labelKey: "Route", href: "/authority/route", icon: Navigation, label: "Route" },
+        { labelKey: "Settings", href: "/settings", icon: Trophy, label: "Account" }, // Reusing Trophy for now or just generic icon
+    ];
+
+    const navItems = isAuthority ? authorityItems : citizenItems;
+    const navItemsRight = isAuthority ? authorityItemsRight : citizenItemsRight;
 
     const Item = ({ item }: { item: any }) => {
         const isActive = pathname === item.href;
@@ -32,7 +66,7 @@ export default function BottomNav() {
                     <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
                 </div>
                 <span className={`text-[10px] font-medium transition-colors ${isActive ? "text-green-600" : "text-gray-500"}`}>
-                    {t(item.labelKey)}
+                    {item.label || t(item.labelKey)}
                 </span>
                 {isActive && (
                     <motion.div
@@ -57,19 +91,21 @@ export default function BottomNav() {
                     ))}
                 </div>
 
-                {/* Center Floating Button */}
-                <div className="absolute left-1/2 -top-12 transform -translate-x-1/2">
-                    <Link href="/report">
-                        <motion.div
-                            whileHover={{ y: -5, scale: 1.05 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-green-400 via-green-600 to-green-700 shadow-[0_15px_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center text-white relative group border-4 border-white"
-                        >
-                            <Plus size={36} strokeWidth={3} />
-                            <div className="absolute inset-0 rounded-[20px] bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
-                        </motion.div>
-                    </Link>
-                </div>
+                {/* Center Floating Button - HIDDEN FOR AUTHORITIES */}
+                {!isAuthority && (
+                    <div className="absolute left-1/2 -top-12 transform -translate-x-1/2">
+                        <Link href="/report">
+                            <motion.div
+                                whileHover={{ y: -5, scale: 1.05 }}
+                                whileTap={{ scale: 0.9 }}
+                                className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-green-400 via-green-600 to-green-700 shadow-[0_15px_30px_-5px_rgba(16,185,129,0.5)] flex items-center justify-center text-white relative group border-4 border-white"
+                            >
+                                <Plus size={36} strokeWidth={3} />
+                                <div className="absolute inset-0 rounded-[20px] bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
+                            </motion.div>
+                        </Link>
+                    </div>
+                )}
 
                 {/* Right Items */}
                 <div className="flex w-2/5 justify-between">

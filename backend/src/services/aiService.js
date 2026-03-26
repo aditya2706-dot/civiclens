@@ -22,6 +22,8 @@ const analyzeImageGemini = async (imageBase64, mimeType, addressContext = '', de
         - "isGenuine": Set to false if the photo is NOT a public civic infrastructure issue.
         - "fraudReason": If isGenuine is false, explain why (e.g., "Photo appears to be of a private residence floor, which is not a civic issue").
         - "suggestedCategory": Choose exactly one: Litter, Open Dump, Pothole, Streetlight, Sewage, Infrastructure.
+        - "estimatedCost": Ensure realistic repair cost strictly as a Number (in INR, e.g. 15000). If unclear or not genuine, output 0.
+        - "estimatedResources": A very short 2-3 word string summarizing required equipment/labor (e.g. "1 JCB, 3 Workers" or "2 Technicians").
         
         Provide the response strictly following this JSON structure:
         {
@@ -31,7 +33,9 @@ const analyzeImageGemini = async (imageBase64, mimeType, addressContext = '', de
           "estimatedSeverity": "Low, Medium, or High",
           "suggestedWard": "String or Unknown",
           "isGenuine": boolean,
-          "fraudReason": "string explanation"
+          "fraudReason": "string explanation",
+          "estimatedCost": number,
+          "estimatedResources": "string"
         }`;
 
         let context = '';
@@ -75,9 +79,11 @@ const analyzeImageGemini = async (imageBase64, mimeType, addressContext = '', de
                         estimatedSeverity: { type: Type.STRING },
                         suggestedWard: { type: Type.STRING },
                         isGenuine: { type: Type.BOOLEAN },
-                        fraudReason: { type: Type.STRING }
+                        fraudReason: { type: Type.STRING },
+                        estimatedCost: { type: Type.NUMBER },
+                        estimatedResources: { type: Type.STRING }
                     },
-                    required: ["summary", "detectedObjects", "suggestedCategory", "estimatedSeverity", "suggestedWard", "isGenuine", "fraudReason"]
+                    required: ["summary", "detectedObjects", "suggestedCategory", "estimatedSeverity", "suggestedWard", "isGenuine", "fraudReason", "estimatedCost", "estimatedResources"]
                 },
             }
         });

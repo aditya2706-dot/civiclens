@@ -55,6 +55,46 @@ const submitReport = async (req, res) => {
     try {
         const { imageUrl, location, description, isAnonymous, category, aiSummary, detectedObjects, severity, department, ward } = req.body;
 
+        // SLA Deadlines: High=24h, Medium=48h, Low=72h
+        let hoursToAdd = 48;
+        if (severity === 'High') hoursToAdd = 24;
+        if (severity === 'Low') hoursToAdd = 72;
+        const deadline = new Date();
+        deadline.setHours(deadline.getHours() + hoursToAdd);
+
+        const resolutionOTP = Math.floor(1000 + Math.random() * 9000).toString();
+
+        // Deduplication Engine: Detect similar open reports within 50 meters
+        let duplicateOf = null;
+        if (location && location.lat && location.lng && category) {
+            const pendingReports = await Report.find({ 
+                category: category, 
+                status: { $ne: 'Resolved' },
+                isDuplicateOf: null // Match only master tickets
+            });
+
+            const toRad = x => x * Math.PI / 180;
+            for (let pr of pendingReports) {
+                if (pr.location && pr.location.lat && pr.location.lng) {
+                    const R = 6371e3; // Earth radius in metres
+                    const dLat = toRad(location.lat - pr.location.lat);
+                    const dLon = toRad(location.lng - pr.location.lng);
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                            Math.cos(toRad(pr.location.lat)) * Math.cos(toRad(location.lat)) *
+                            Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    const distance = R * c;
+
+                    // If within 50 meters, flag as duplicate and increment master ticket
+                    if (distance <= 50) {
+                        duplicateOf = pr._id;
+                        await Report.findByIdAndUpdate(pr._id, { $inc: { duplicateCount: 1 } });
+                        break;
+                    }
+                }
+            }
+        }
+
         // Step 3: Create Report (already analyzed by frontend)
         const reportData = {
             imageUrl,
@@ -66,6 +106,11 @@ const submitReport = async (req, res) => {
             location,
             department: department,
             ward: ward,
+            deadline: deadline,
+            resolutionOTP: resolutionOTP,
+            estimatedCost: req.body.estimatedCost || 0,
+            estimatedResources: req.body.estimatedResources || "Unknown",
+            isDuplicateOf: duplicateOf,
         };
 
         if (!isAnonymous && req.user) {
@@ -107,22 +152,50 @@ const getReports = async (req, res) => {
     try {
         const cached = getCache('reports_list');
         if (cached) {
-            res.set('Cache-Control', 'public, max-age=15');
+            res.set('Cache-Control', 'public, max-age=30');
             return res.json(cached);
         }
+        
         const reports = await Report.find({})
             .sort({ createdAt: -1 })
-            .limit(10)
+            .limit(30)
             .lean();
+        
+        const now = new Date();
         const sanitizedReports = reports.map(r => ({
             ...r,
+            isEscalated: r.status !== 'Resolved' && r.deadline && new Date(r.deadline) < now,
             imageUrl: (r.imageUrl && r.imageUrl.includes('example.com')) ? null : r.imageUrl
         }));
-        setCache('reports_list', sanitizedReports, 15000);
-        res.set('Cache-Control', 'public, max-age=15');
+        
+        // Cache public dashboard for 30 seconds
+        setCache('reports_list', sanitizedReports, 30000);
+        res.set('Cache-Control', 'public, max-age=30');
         res.json(sanitizedReports);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching reports', error: error.message });
+    }
+};
+
+// @desc    Get reports assigned to the logged-in citizen
+// @route   GET /api/reports/my
+// @access  Private
+const getMyReports = async (req, res) => {
+    try {
+        const reports = await Report.find({ userId: req.user._id })
+            .sort({ createdAt: -1 })
+            .lean();
+            
+        const now = new Date();
+        const sanitizedReports = reports.map(r => ({
+            ...r,
+            isEscalated: r.status !== 'Resolved' && r.deadline && new Date(r.deadline) < now,
+            imageUrl: (r.imageUrl && r.imageUrl.includes('example.com')) ? null : r.imageUrl
+        }));
+        
+        res.json(sanitizedReports);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching your reports', error: error.message });
     }
 };
 
@@ -132,26 +205,46 @@ const getReports = async (req, res) => {
 const getAuthorityReports = async (req, res) => {
     try {
         const { status } = req.query;
-        let query = {};
+        // Dynamically scope cache to the exact user context and query string
+        const cacheKey = `auth_reports_${req.user._id}_${status || 'all'}`;
+        
+        const cached = getCache(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'private, max-age=30');
+            return res.json(cached);
+        }
 
-        // If not a global admin, restrict to their specific department and ward
+        let query = { isDuplicateOf: null };
+
         if (req.user.role !== 'admin') {
-            if (req.user.department) query.department = req.user.department;
-            if (req.user.ward) query.ward = req.user.ward;
+            if (req.user.department && req.user.department !== 'Administration') {
+                query.department = req.user.department;
+            }
+            if (req.user.ward && req.user.ward !== 'All Wards') {
+                query.ward = req.user.ward;
+            }
         }
 
         if (status) query.status = status;
 
         const reports = await Report.find(query)
             .sort({ createdAt: -1 })
-            .limit(10)
+            .limit(100)
             .lean();
+        
+        const now = new Date();
         const sanitizedReports = reports.map(r => ({
             ...r,
+            isEscalated: r.status !== 'Resolved' && r.deadline && new Date(r.deadline) < now,
             imageUrl: (r.imageUrl && r.imageUrl.includes('example.com')) ? null : r.imageUrl
         }));
+        
+        // Cache authority dashboard for 30 seconds to block infinite polling lag
+        setCache(cacheKey, sanitizedReports, 30000);
+        res.set('Cache-Control', 'private, max-age=30');
         res.json(sanitizedReports);
     } catch (error) {
+        console.error("Authority reports error:", error);
         res.status(500).json({ message: 'Error fetching authority reports', error: error.message });
     }
 };
@@ -225,10 +318,21 @@ const getReportById = async (req, res) => {
 // @access  Private/Admin
 const updateReportStatus = async (req, res) => {
     try {
-        const { status, resolutionImageUrl } = req.body;
+        const { status, resolutionImageUrl, otp } = req.body;
         const report = await Report.findById(req.params.id);
 
         if (report) {
+            // Verify OTP if attempting to resolve without a photo
+            if (status === 'Resolved' && report.status !== 'Resolved') {
+                if (otp) {
+                    if (report.resolutionOTP !== otp) {
+                        return res.status(400).json({ message: 'Invalid Verification OTP' });
+                    }
+                } else if (!resolutionImageUrl) {
+                    return res.status(400).json({ message: 'Resolution requires either an OTP or a Proof Photo' });
+                }
+            }
+
             // Check if status is transitioning to Resolved
             if (status === 'Resolved' && report.status !== 'Resolved' && report.userId) {
                 // Award 50 points to the citizen who reported it
@@ -238,7 +342,7 @@ const updateReportStatus = async (req, res) => {
                 await Notification.create({
                     userId: report.userId,
                     reportId: report._id,
-                    title: 'Issue Resolved! 🎉',
+                    title: otp ? 'Issue Resolved via OTP! 🎉' : 'Issue Resolved! 🎉',
                     message: `Thank you! The ${report.category} issue you reported has been officially resolved. You earned 50 Civic Points!`,
                     type: 'STATUS_UPDATE'
                 });
@@ -256,6 +360,36 @@ const updateReportStatus = async (req, res) => {
         }
     } catch (error) {
         res.status(500).json({ message: 'Error updating report', error: error.message });
+    }
+};
+
+// @desc    Transfer report to a different department
+// @route   PUT /api/reports/:id/transfer
+// @access  Private/Admin or Authority
+const transferReport = async (req, res) => {
+    try {
+        const { newDepartment } = req.body;
+        const report = await Report.findById(req.params.id);
+
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        const oldDepartment = report.department;
+        report.department = newDepartment;
+        
+        // Add an automatic comment about the transfer
+        const transferComment = {
+            user: req.user._id,
+            text: `System Update: Report transferred from ${oldDepartment} to ${newDepartment}.`,
+            isAuthority: true
+        };
+        report.comments.push(transferComment);
+
+        const updatedReport = await report.save();
+        res.json(updatedReport);
+    } catch (error) {
+        res.status(500).json({ message: 'Error transferring report', error: error.message });
     }
 };
 
@@ -367,8 +501,8 @@ async function getMapReports(req, res) {
 
         const reports = await Report.find(query)
             .sort({ createdAt: -1 })
-            .limit(20)
-            .select('location status category severity ward imageUrl description aiSummary')
+            .limit(150)
+            .select('location status category severity ward _id')
             .lean(); 
             
         const sanitizedReports = reports.map(r => ({
@@ -384,14 +518,38 @@ async function getMapReports(req, res) {
     }
 }
 
+// @desc    Get global statistics (unresolved count)
+// @route   GET /api/reports/stats
+// @access  Public
+const getReportsStats = async (req, res) => {
+    try {
+        const cacheKey = 'global_stats';
+        const cached = getCache(cacheKey);
+        if (cached) return res.json(cached);
+
+        const unresolvedCount = await Report.countDocuments({ 
+            status: { $in: ['Pending', 'Under Review', 'In Progress'] } 
+        });
+
+        const data = { unresolvedCount };
+        setCache(cacheKey, data, 30000); // 30s cache
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching stats', error: error.message });
+    }
+}
+
 module.exports = {
     analyzeImage,
     submitReport,
     getReports,
+    getMyReports,
     getAuthorityReports,
     getMapReports,
+    getReportsStats,
     getReportById,
     updateReportStatus,
+    transferReport,
     verifyReport,
     toggleUpvote,
     addComment,

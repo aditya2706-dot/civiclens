@@ -5,7 +5,7 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { optimizeRoute } from "@/utils/routeOptimizer";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Navigation, MapPin, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Navigation, MapPin, Search, Loader2, FileText } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -76,9 +76,9 @@ export default function RoutePlannerPage() {
     }
 
     return (
-        <main className="h-screen flex flex-col bg-gray-50 overflow-hidden relative font-sans">
+        <main className="h-screen flex flex-col bg-gray-50 overflow-hidden relative font-sans print:h-auto print:overflow-visible">
             {/* Map Area (Top 50%) */}
-            <div className="h-1/2 w-full relative">
+            <div className="h-1/2 w-full relative print:hidden">
                 {currentLocation && <AuthorityRouteMap currentLocation={currentLocation} route={route} /> }
                 
                 {/* Floating Back Button */}
@@ -97,13 +97,22 @@ export default function RoutePlannerPage() {
             </div>
 
             {/* Bottom Sheet Itinerary (Bottom 50%) */}
-            <div className="h-1/2 w-full bg-white rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] -mt-6 z-[500] relative flex flex-col">
-                <div className="p-6 pb-2 border-b border-gray-100 flex-shrink-0">
-                    <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
-                    <h2 className="text-2xl font-black text-gray-800 tracking-tight">Today's Itinerary</h2>
-                    <p className="text-sm font-medium text-gray-500 italic mt-1">
-                        {route.length} stops strategically ordered from your location.
-                    </p>
+            <div className="h-1/2 w-full bg-white rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] -mt-6 z-[500] relative flex flex-col print:h-auto print:rounded-none print:shadow-none print:-mt-0">
+                <div className="p-6 pb-2 border-b border-gray-100 flex-shrink-0 flex justify-between items-end print:border-b-2">
+                    <div>
+                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-6 print:hidden" />
+                        <h2 className="text-2xl font-black text-gray-800 tracking-tight">Today's Itinerary</h2>
+                        <p className="text-sm font-medium text-gray-500 italic mt-1">
+                            {route.length} stops strategically ordered from your location.
+                        </p>
+                    </div>
+                    <button 
+                        onClick={() => window.print()}
+                        className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-black transition-colors flex items-center gap-2 print:hidden"
+                    >
+                        <FileText size={16} />
+                        Print PDF
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -144,12 +153,23 @@ export default function RoutePlannerPage() {
                                     </div>
                                 </div>
 
-                                <Link 
-                                    href={`/reports/${stop._id}`}
-                                    className="w-10 h-10 bg-slate-50 border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-colors shrink-0"
-                                >
-                                    <ArrowLeft size={18} className="rotate-180" />
-                                </Link>
+                                <div className="flex items-center gap-2 shrink-0 print:hidden">
+                                    {stop.location?.lat && stop.location?.lng && (
+                                        <a 
+                                            href={`https://www.google.com/maps/dir/?api=1&destination=${stop.location.lat},${stop.location.lng}`}
+                                            target="_blank" rel="noopener noreferrer"
+                                            className="h-10 px-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center text-blue-600 font-bold text-xs gap-1 hover:bg-blue-600 hover:text-white transition-colors"
+                                        >
+                                            <MapPin size={14} /> Navigate
+                                        </a>
+                                    )}
+                                    <Link 
+                                        href={`/reports/${stop._id}`}
+                                        className="w-10 h-10 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                                    >
+                                        <ArrowLeft size={18} className="rotate-180" />
+                                    </Link>
+                                </div>
                             </motion.div>
                         ))
                     )}
