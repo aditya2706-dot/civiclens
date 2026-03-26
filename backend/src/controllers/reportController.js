@@ -216,12 +216,18 @@ const getAuthorityReports = async (req, res) => {
 
         let query = { isDuplicateOf: null };
 
+        // Build a flexible query: match by ward OR department to handle reports
+        // that may only have one of these fields populated.
         if (req.user.role !== 'admin') {
-            if (req.user.department && req.user.department !== 'Administration') {
-                query.department = req.user.department;
-            }
+            const orClauses = [];
             if (req.user.ward && req.user.ward !== 'All Wards') {
-                query.ward = req.user.ward;
+                orClauses.push({ ward: req.user.ward });
+            }
+            if (req.user.department && req.user.department !== 'Administration') {
+                orClauses.push({ department: req.user.department });
+            }
+            if (orClauses.length > 0) {
+                query.$or = orClauses;
             }
         }
 
