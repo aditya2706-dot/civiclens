@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { MessageCircle, Send, CheckCircle2 } from "lucide-react";
+import { MessageCircle, Send, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useState, useRef } from "react";
 import axios from "axios";
 import html2canvas from "html2canvas";
@@ -16,6 +16,7 @@ export function Step3Submit({
     const [submitted, setSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSharing, setIsSharing] = useState(false);
+    const [otp, setOtp] = useState<string | null>(null);
     const shareCardRef = useRef<HTMLDivElement>(null);
     const [isEditingLocation, setIsEditingLocation] = useState(false);
     const [manualAddress, setManualAddress] = useState("");
@@ -58,6 +59,7 @@ export function Step3Submit({
             const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports`, payload, { headers });
 
             if (res.data) {
+                setOtp(res.data.resolutionOTP || null);
                 setSubmitted(true);
             }
         } catch (error) {
@@ -130,7 +132,31 @@ export function Step3Submit({
                     <p className="text-gray-500">The concerned authorities have been notified.</p>
                 </div>
 
-                <div className="w-full max-w-sm bg-gray-50 p-6 rounded-3xl mt-8 space-y-4">
+                {/* Security PIN Card — shown to every citizen after submission */}
+                <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 via-slate-800 to-black rounded-[2rem] p-6 shadow-2xl border border-slate-700 text-white relative overflow-hidden">
+                    <div className="absolute -top-8 -right-8 w-24 h-24 bg-emerald-500/20 rounded-full blur-2xl" />
+                    <div className="flex items-center gap-3 mb-2 relative z-10">
+                        <ShieldCheck size={22} className="text-emerald-400" />
+                        <h3 className="font-black text-base tracking-tight">Your Resolution PIN</h3>
+                    </div>
+                    <p className="text-slate-400 text-xs font-medium mb-4 relative z-10 leading-snug">
+                        Give this PIN to the field worker <strong className="text-white">only</strong> when they physically fix the issue — to confirm resolution without a photo.
+                    </p>
+                    {otp ? (
+                        <div className="bg-white/10 rounded-[1.5rem] p-4 flex justify-center items-center backdrop-blur-md border border-white/20 relative z-10">
+                            <span className="font-mono text-5xl font-black tracking-[0.5em] ml-[0.25em] text-emerald-300 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]">
+                                {otp}
+                            </span>
+                        </div>
+                    ) : (
+                        <div className="bg-white/10 rounded-[1.5rem] p-4 flex justify-center items-center relative z-10">
+                            <span className="text-slate-400 text-sm font-medium">PIN available if you log in and view your report</span>
+                        </div>
+                    )}
+                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-3 text-center relative z-10">Screenshot & save this PIN 📸</p>
+                </div>
+
+                <div className="w-full max-w-sm bg-gray-50 p-6 rounded-3xl space-y-4">
                     <h3 className="font-semibold text-gray-700">Need Faster Action?</h3>
                     <p className="text-sm text-gray-500">Alert your local WhatsApp groups to increase visibility.</p>
                     <button
