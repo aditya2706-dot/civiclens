@@ -19,6 +19,7 @@ export default function AuthorityDashboard() {
     const [resolveFile, setResolveFile] = useState<File | null>(null);
     const [resolveMode, setResolveMode] = useState<"photo" | "otp">("photo");
     const [isResolving, setIsResolving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Broadcast State
     const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
@@ -52,9 +53,14 @@ export default function AuthorityDashboard() {
                 });
                 setReports(reportsRes.data);
 
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Failed to load dashboard data", error);
-                router.push("/login");
+                if (error?.response?.status === 401) {
+                    localStorage.removeItem("token");
+                    router.push("/login");
+                } else {
+                    setError("Could not connect to the server. Please check your connection and try again.");
+                }
             } finally {
                 setLoading(false);
             }
@@ -153,6 +159,24 @@ export default function AuthorityDashboard() {
 
     if (loading) {
         return <PremiumLoader message="Authenticating Authority Portal..." />;
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 px-6">
+                <div className="w-16 h-16 rounded-3xl bg-red-50 border border-red-100 flex items-center justify-center">
+                    <AlertTriangle size={28} className="text-red-500" />
+                </div>
+                <h2 className="text-xl font-black text-slate-800">Connection Failed</h2>
+                <p className="text-slate-500 text-sm text-center max-w-xs">{error}</p>
+                <button
+                    onClick={() => window.location.reload()}
+                    className="mt-2 px-6 py-3 bg-slate-900 text-white font-bold rounded-2xl text-sm"
+                >
+                    Try Again
+                </button>
+            </div>
+        );
     }
 
     const totalReports = reports.length;
