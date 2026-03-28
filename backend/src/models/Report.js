@@ -54,8 +54,18 @@ const reportSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['Pending', 'Under Review', 'In Progress', 'Resolved'],
+        enum: ['Pending', 'Under Review', 'In Progress', 'Resolved', 'Under Audit'],
         default: 'Pending',
+    },
+    isDisputed: {
+        type: Boolean,
+        default: false,
+    },
+    disputeReason: {
+        type: String,
+    },
+    disputeResolvedAt: {
+        type: Date,
     },
     deadline: {
         type: Date,

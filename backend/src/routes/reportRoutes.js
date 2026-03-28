@@ -16,7 +16,8 @@ const {
     getWardStats,
     getReportsStats,
     getMapReports,
-    transferReport
+    transferReport,
+    rejectResolution
 } = require('../controllers/reportController');
 const { protect, optionalAuth, admin, authority, adminOrAuthority } = require('../middlewares/authMiddleware');
 
@@ -45,6 +46,7 @@ router.route('/:id/verify').post(verifyReport);
 router.route('/:id/upvote').post(protect, toggleUpvote);
 router.route('/:id/comments').post(protect, addComment);
 router.route('/:id/translate').post(translateReport);
+router.route('/:id/reject').put(protect, rejectResolution);
 
 // Admin/Authority route to update status
 router.route('/:id/status').put(protect, adminOrAuthority, updateReportStatus);

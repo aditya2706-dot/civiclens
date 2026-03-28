@@ -273,18 +273,6 @@ const getLeaderboard = async (req, res) => {
     }
 };
 
-module.exports = {
-    registerUser,
-    loginUser,
-    getUserProfile,
-    updateUserProfile,
-    sendOtp,
-    verifyOtp,
-    getLeaderboard,
-    forgotPassword,
-    resetPassword
-};
-
 // @desc    Forgot Password - Send OTP to email
 // @route   POST /api/auth/forgot-password
 // @access  Public
@@ -343,3 +331,79 @@ async function resetPassword(req, res) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 }
+
+// @desc    Authenticate with Google OAuth
+// @route   POST /api/auth/google
+// @access  Public
+const googleAuth = async (req, res) => {
+    const { googleUserInfo } = req.body;
+
+    if (!googleUserInfo || !googleUserInfo.sub) {
+        return res.status(400).json({ message: 'Valid Google user info is required.' });
+    }
+
+    try {
+        const { sub: googleId, email, name, picture } = googleUserInfo;
+
+        if (!email || !googleId) {
+            return res.status(400).json({ message: 'Google account must have a valid email.' });
+        }
+
+        // Find or create user
+        let user = await User.findOne({ googleId });
+
+        if (!user) {
+            // Check if email already exists (user registered with email/password before)
+            user = await User.findOne({ email });
+
+            if (user) {
+                // Link Google account to existing email account
+                user.googleId = googleId;
+                user.avatar = picture;
+                await user.save();
+            } else {
+                // Brand new user — create citizen account automatically
+                user = await User.create({
+                    name,
+                    email,
+                    googleId,
+                    avatar: picture,
+                    role: 'citizen',
+                    civicPoints: 0,
+                });
+            }
+        }
+
+        // Refresh avatar if it changed
+        if (picture && user.avatar !== picture) {
+            user.avatar = picture;
+            await user.save();
+        }
+
+        res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            avatar: user.avatar,
+            civicPoints: user.civicPoints,
+            token: generateToken(user._id),
+        });
+    } catch (error) {
+        console.error('Google Auth Error:', error.message);
+        res.status(500).json({ message: 'Google authentication failed.', error: error.message });
+    }
+};
+
+module.exports = {
+    registerUser,
+    loginUser,
+    getUserProfile,
+    updateUserProfile,
+    sendOtp,
+    verifyOtp,
+    getLeaderboard,
+    forgotPassword,
+    resetPassword,
+    googleAuth,
+};

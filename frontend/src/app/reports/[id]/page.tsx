@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Calendar, ThumbsUp, ThumbsDown, CheckCircle2, Send, MessageCircle, ShieldCheck, Share2, Link as LinkIcon, Twitter, Phone, Languages, Trash2, Info } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, ThumbsUp, ThumbsDown, CheckCircle2, Send, MessageCircle, ShieldCheck, Share2, Link as LinkIcon, Twitter, Phone, Languages, Trash2, Info, X, AlertOctagon } from "lucide-react";
 import axios from "axios";
 
 export default function ReportDetails() {
@@ -18,6 +18,9 @@ export default function ReportDetails() {
     const [translating, setTranslating] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isOwner, setIsOwner] = useState(false);
+    const [showDisputeModal, setShowDisputeModal] = useState(false);
+    const [disputeReason, setDisputeReason] = useState("");
+    const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
 
     const handleDelete = async () => {
         if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
@@ -61,6 +64,33 @@ export default function ReportDetails() {
         if (id) fetchReport();
     }, [id]);
 
+    const handleRejectResolution = async () => {
+        if (!disputeReason.trim()) {
+            alert("Please provide a reason for rejecting this resolution.");
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        setIsSubmittingDispute(true);
+        try {
+            const res = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/reject`, 
+                { reason: disputeReason },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setReport(res.data);
+            setShowDisputeModal(false);
+            setDisputeReason("");
+            alert("Dispute filed. The report is now under internal audit.");
+        } catch (err) {
+            console.error("Failed to reject resolution:", err);
+            alert("Failed to file dispute. Please try again.");
+        } finally {
+            setIsSubmittingDispute(false);
+        }
+    };
+
     const handleVerify = async (vote: "yes" | "no") => {
         try {
             const isAccurate = vote === "yes";
@@ -80,6 +110,7 @@ export default function ReportDetails() {
             case 'Pending': return 'bg-red-500 text-white';
             case 'Under Review': return 'bg-yellow-500 text-black';
             case 'Resolved': return 'bg-green-500 text-white';
+            case 'Under Audit': return 'bg-purple-600 text-white animate-pulse';
             default: return 'bg-gray-500 text-white';
         }
     };
@@ -222,20 +253,31 @@ export default function ReportDetails() {
                 {/* Embedded Image Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
 
-                {/* Ownership Check for Deletion */}
+                {/* Ownership Check for Deletion & Dispute */}
                 {isOwner && (
-                    <button
-                        onClick={handleDelete}
-                        disabled={isDeleting}
-                        className="absolute top-6 right-6 z-10 w-12 h-12 bg-red-500/80 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-red-400 hover:bg-red-600 transition-all shadow-lg hidden print:hidden"
-                        title="Delete Report"
-                    >
-                        {isDeleting ? (
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                            <Trash2 size={18} className="drop-shadow-md" />
+                    <div className="absolute top-6 right-6 z-10 flex gap-2">
+                        {report.status === 'Resolved' && (
+                            <button
+                                onClick={() => setShowDisputeModal(true)}
+                                className="w-12 h-12 bg-orange-500/80 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-orange-400 hover:bg-orange-600 transition-all shadow-lg hidden print:hidden"
+                                title="Reject Resolution / Dispute"
+                            >
+                                <AlertOctagon size={18} className="drop-shadow-md" />
+                            </button>
                         )}
-                    </button>
+                        <button
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="w-12 h-12 bg-red-500/80 backdrop-blur-xl rounded-full flex items-center justify-center text-white border border-red-400 hover:bg-red-600 transition-all shadow-lg hidden print:hidden"
+                            title="Delete Report"
+                        >
+                            {isDeleting ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <Trash2 size={18} className="drop-shadow-md" />
+                            )}
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -252,9 +294,17 @@ export default function ReportDetails() {
                             </span>
                         )}
                     </div>
-                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm ml-auto ${getStatusBadge(report.status)} bg-opacity-10 text-opacity-100 border`}>
-                        {report.status}
-                    </span>
+                    <div className="flex items-center gap-2 ml-auto">
+                        {report.isDisputed && (
+                            <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm bg-red-100 text-red-700 border border-red-200 flex items-center gap-1">
+                                <AlertOctagon size={12} />
+                                Disputed
+                            </span>
+                        )}
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm ${getStatusBadge(report.status)} bg-opacity-10 text-opacity-100 border`}>
+                            {report.status}
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -510,6 +560,51 @@ export default function ReportDetails() {
                     </form>
                 </div>
             </div>
+
+            {/* Dispute Modal (Apple-style overlay) */}
+            {showDisputeModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowDisputeModal(false)} />
+                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-slate-100 animate-in fade-in zoom-in duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="bg-orange-100 p-3 rounded-2xl">
+                                <AlertOctagon className="text-orange-600" size={24} />
+                            </div>
+                            <button onClick={() => setShowDisputeModal(false)} className="text-slate-400 hover:text-slate-600 p-2">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-2">Reject Resolution?</h3>
+                        <p className="text-slate-500 text-sm font-medium mb-6 leading-relaxed">
+                            If the issue wasn't actually fixed or the photo is fake, please tell us why. A supervisor will audit this report.
+                        </p>
+                        
+                        <textarea
+                            value={disputeReason}
+                            onChange={(e) => setDisputeReason(e.target.value)}
+                            placeholder="e.g. The pothole is still there, only half-filled..."
+                            className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none resize-none mb-6"
+                        />
+                        
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleRejectResolution}
+                                disabled={isSubmittingDispute || !disputeReason.trim()}
+                                className="w-full py-4 bg-orange-600 text-white font-black rounded-2xl shadow-xl shadow-orange-200 hover:bg-orange-700 transition-all disabled:opacity-50"
+                            >
+                                {isSubmittingDispute ? "Submitting Dispute..." : "Submit Dispute"}
+                            </button>
+                            <button
+                                onClick={() => setShowDisputeModal(false)}
+                                className="w-full py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

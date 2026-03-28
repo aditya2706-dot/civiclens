@@ -10,8 +10,8 @@ const analyzeImageGemini = async (imageBase64, mimeType, addressContext = '', de
         
         STRICT VALIDATION RULES:
         1. ONLY accept photos of PUBLIC CIVIC INFRASTRUCTURE issues.
-        2. ACCEPTABLE CATEGORIES: Litter, Open Dump (Garbage pile), Pothole (Road damage), Streetlight (Broken/Dark), Sewage (Leaks/Flow), or General Infrastructure (Broken public benches, damaged sidewalks).
-        3. REJECT IF: The photo is of a private interior (home floor, bedroom), personal items (furniture, electronics), pets, people, selfies, screenshots, or any non-infrastructure object.
+        2. ACCEPTABLE CATEGORIES: Litter, Open Dump (Garbage), Encroachment (Footpath blockage/illegal stalls), Animal Welfare (Stray animals in distress), Noise Pollution (Construction/Loud speakers), Pothole (Road damage), Streetlight (Broken/Dark), Sewage (Leaks/Flow), Infrastructure (Broken benches/toilets), Greenery (Dying trees/Park maintenance), Public Toilet (Cleanliness), Dark Spot (Areas lacking lighting safety).
+        3. REJECT IF: The photo is of a private interior (home floor, bedroom), personal items (furniture, electronics), pets (unless stray and in distress), people, selfies, screenshots, or any non-infrastructure object.
         4. REJECT IF: The photo is a meme, stock image, or computer screen.
 
         GEOGRAPHIC IDENTIFICATION:
@@ -19,15 +19,16 @@ const analyzeImageGemini = async (imageBase64, mimeType, addressContext = '', de
         If "Ward Context" is NOT provided, use your internal knowledge of the provided GPS coordinates and image landmarks to identify the specific Ward Name or Local Area Name (e.g., "Shivaji Park, Alwar" or "Connaught Place, Delhi").
 
         RESPONSE PARAMETERS:
+        - "summary": A professional 1-2 sentence description of the problem in English. IMPORTANT: If the user provides a description in a local language (Hindi, etc.), TRANSLATE it into professional English for this field.
         - "isGenuine": Set to false if the photo is NOT a public civic infrastructure issue.
         - "fraudReason": If isGenuine is false, explain why (e.g., "Photo appears to be of a private residence floor, which is not a civic issue").
-        - "suggestedCategory": Choose exactly one: Litter, Open Dump, Pothole, Streetlight, Sewage, Infrastructure.
+        - "suggestedCategory": Choose exactly one: Litter, Open Dump, Encroachment, Animal Welfare, Noise Pollution, Pothole, Streetlight, Sewage, Infrastructure, Greenery, Public Toilet, Dark Spot, Other.
         - "estimatedCost": Ensure realistic repair cost strictly as a Number (in INR, e.g. 15000). If unclear or not genuine, output 0.
         - "estimatedResources": A very short 2-3 word string summarizing required equipment/labor (e.g. "1 JCB, 3 Workers" or "2 Technicians").
         
         Provide the response strictly following this JSON structure:
         {
-          "summary": "1-2 sentence description of the problem",
+          "summary": "String description in English",
           "detectedObjects": ["list", "of", "relevant", "objects"],
           "suggestedCategory": "String category name",
           "estimatedSeverity": "Low, Medium, or High",

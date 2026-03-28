@@ -368,6 +368,63 @@ const updateReportStatus = async (req, res) => {
         res.status(500).json({ message: 'Error updating report', error: error.message });
     }
 };
+// @desc    Reject a resolution provided by authority (Dispute)
+// @route   PUT /api/reports/:id/reject
+// @access  Private (Owner only)
+const rejectResolution = async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const report = await Report.findById(req.params.id);
+
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        // Only the original reporter can reject the resolution
+        if (!report.userId || report.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Only the original reporter can dispute a resolution.' });
+        }
+
+        if (report.status !== 'Resolved') {
+            return res.status(400).json({ message: 'Only resolved reports can be disputed.' });
+        }
+
+        report.status = 'Under Audit';
+        report.isDisputed = true;
+        report.disputeReason = reason;
+
+        // Add a system comment for the dispute
+        report.comments.push({
+            user: req.user._id,
+            text: `🚨 DISPUTE FILED: Citizen rejected the resolution. Reason: ${reason}`,
+            isAuthority: false
+        });
+
+        // Notify authorities in this ward/department about the dispute
+        const authorities = await User.find({ 
+            role: 'authority', 
+            $or: [{ ward: report.ward }, { department: report.department }] 
+        });
+
+        const notifications = authorities.map(auth => ({
+            userId: auth._id,
+            reportId: report._id,
+            title: 'Resolution Disputed! 🚨',
+            message: `A citizen has rejected your resolution for a ${report.category} issue in ${report.ward}. Internal audit required.`,
+            type: 'STATUS_UPDATE'
+        }));
+
+        if (notifications.length > 0) {
+            await Notification.insertMany(notifications);
+        }
+
+        const updatedReport = await report.save();
+        res.json(updatedReport);
+    } catch (error) {
+        res.status(500).json({ message: 'Error rejecting resolution', error: error.message });
+    }
+};
+
 
 // @desc    Transfer report to a different department
 // @route   PUT /api/reports/:id/transfer
@@ -555,6 +612,7 @@ module.exports = {
     getReportsStats,
     getReportById,
     updateReportStatus,
+    rejectResolution,
     transferReport,
     verifyReport,
     toggleUpvote,

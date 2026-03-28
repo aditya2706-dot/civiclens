@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
-import { MessageCircle, Send, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useState, useRef } from "react";
 import axios from "axios";
 import html2canvas from "html2canvas";
 import ShareCard from "../ShareCard";
+import VoiceRecorder from "./VoiceRecorder";
+import { Mic, CheckCircle2, ShieldCheck, MessageCircle, Send } from "lucide-react";
 
 export function Step3Submit({
     onBack,
@@ -20,8 +21,9 @@ export function Step3Submit({
     const shareCardRef = useRef<HTMLDivElement>(null);
     const [isEditingLocation, setIsEditingLocation] = useState(false);
     const [manualAddress, setManualAddress] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState(data.aiAnalysis?.suggestedCategory || "Other");
+    const [description, setDescription] = useState(data.aiAnalysis?.summary || "");
     const [selectedWard, setSelectedWard] = useState(data.aiAnalysis?.suggestedWard || "");
-    const [description, setDescription] = useState("");
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
@@ -37,7 +39,7 @@ export function Step3Submit({
 
             const payload = {
                 imageUrl: data.base64Image || data.imageUrl,
-                category: data.aiAnalysis?.suggestedCategory || 'Other',
+                category: selectedCategory,
                 description: description,
                 aiSummary: data.aiAnalysis?.summary || '',
                 detectedObjects: data.aiAnalysis?.detectedObjects || [],
@@ -193,12 +195,27 @@ export function Step3Submit({
             <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
                 <h3 className="font-bold text-gray-800 border-b border-gray-100 pb-4">Report Summary</h3>
 
-                <div className="space-y-3 pt-2">
-                    <div className="flex justify-between items-start">
-                        <span className="text-sm text-gray-500">Category</span>
-                        <span className="font-semibold text-gray-800">{data.aiAnalysis?.suggestedCategory}</span>
+                <div className="space-y-4 pt-2">
+                    <div className="flex flex-col gap-3">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Category</label>
+                        <div className="flex flex-wrap gap-2">
+                            {['Litter', 'Open Dump', 'Encroachment', 'Animal Welfare', 'Noise Pollution', 'Pothole', 'Streetlight', 'Sewage', 'Infrastructure', 'Greenery', 'Public Toilet', 'Dark Spot', 'Other'].map((cat) => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setSelectedCategory(cat)}
+                                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border ${
+                                        selectedCategory === cat 
+                                        ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-100' 
+                                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                    <div className="flex justify-between items-start">
+
+                    <div className="flex justify-between items-start border-t border-gray-50 pt-3">
                         <span className="text-sm text-gray-500">Location</span>
                         {isEditingLocation ? (
                             <div className="flex flex-col gap-2 items-end">
@@ -240,13 +257,22 @@ export function Step3Submit({
                 </div>
 
                 <div className="pt-4 border-t border-gray-100">
-                    <label className="text-sm font-semibold text-gray-700 ml-1 mb-2 block">Tell us more details (Optional)</label>
+                    <div className="flex justify-between items-center mb-2 px-1">
+                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                            Description
+                            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full uppercase tracking-tighter">AI Pre-filled</span>
+                        </label>
+                        <VoiceRecorder onTranscript={(text: string) => setDescription((prev: string) => prev ? `${prev} ${text}` : text)} />
+                    </div>
                     <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="e.g. This waste is blocking the entrance to the park..."
-                        className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-700 focus:ring-2 focus:ring-green-500 outline-none min-h-[100px] resize-none"
+                        placeholder="Describe the issue in your own words or use the mic..."
+                        className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-700 focus:ring-2 focus:ring-green-500 outline-none min-h-[120px] resize-none leading-relaxed"
                     />
+                    <p className="text-[10px] text-gray-400 mt-2 ml-1 italic">
+                        * Tap the mic to speak in any language (Hindi, etc.). AI will translate it.
+                    </p>
                 </div>
 
                 <div className="pt-4 border-t border-gray-100">

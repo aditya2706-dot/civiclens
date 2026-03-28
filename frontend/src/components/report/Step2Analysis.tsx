@@ -200,11 +200,11 @@ export function Step2Analysis({
                 <h4 className="text-center font-semibold text-gray-700">Is this analysis accurate?</h4>
                 <div className="flex gap-4">
                     <button
-                        onClick={onBack}
+                        onClick={onNext}
                         className="flex-1 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
                     >
                         <Edit2 size={18} />
-                        Adjust Details
+                        Edit manually
                     </button>
                     <button
                         onClick={onNext}

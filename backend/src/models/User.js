@@ -23,7 +23,15 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: true,
+        required: false, // Optional for Google OAuth users
+    },
+    googleId: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
+    avatar: {
+        type: String, // Google profile picture URL
     },
     role: {
         type: String,
@@ -42,15 +50,16 @@ const userSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
-// Hash password before saving
+// Hash password before saving (skip for Google OAuth users)
 userSchema.pre('save', async function () {
-    if (!this.isModified('password')) return;
+    if (!this.password || !this.isModified('password')) return;
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
 });
 
 // Compare password
 userSchema.methods.matchPassword = async function (enteredPassword) {
+    if (!this.password) return false; // Google OAuth users have no password
     return await bcrypt.compare(enteredPassword, this.password);
 };
 

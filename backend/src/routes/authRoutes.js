@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, getUserProfile, updateUserProfile, sendOtp, verifyOtp, getLeaderboard, forgotPassword, resetPassword } = require('../controllers/authController');
+const { registerUser, loginUser, getUserProfile, updateUserProfile, sendOtp, verifyOtp, getLeaderboard, forgotPassword, resetPassword, googleAuth } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 
 router.post('/register', registerUser);
@@ -11,5 +11,6 @@ router.post('/send-otp', sendOtp);
 router.post('/verify-otp', verifyOtp);
 router.get('/leaderboard', getLeaderboard);
 router.route('/profile').get(protect, getUserProfile).put(protect, updateUserProfile);
+router.post('/google', googleAuth);
 
 module.exports = router;
