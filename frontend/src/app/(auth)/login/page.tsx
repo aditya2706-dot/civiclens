@@ -67,33 +67,45 @@ export default function Login() {
     const [googleLoading, setGoogleLoading] = useState(false);
 
     const onGoogleSuccess = async (tokenResponse: any) => {
+        console.log("Google Login: Success receiving token from Google", tokenResponse);
         setGoogleLoading(true);
         setError("");
         try {
+            console.log("Google Login: Fetching user info from Google API...");
             // Exchange the access token for user info, then send to our backend
             const userInfo = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
                 headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
             });
+            console.log("Google Login: User info received", userInfo.data);
 
+            console.log("Google Login: Sending data to CivicLens Backend...", `${process.env.NEXT_PUBLIC_API_URL}/auth/google`);
             // Send to our backend to get a CivicLens JWT
             const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
                 credential: tokenResponse.access_token,
                 googleUserInfo: userInfo.data,
             });
+            console.log("Google Login: Backend response", res.data);
 
             if (res.data?.token) {
+                console.log("Google Login: Token received! Redirecting...");
                 localStorage.setItem('token', res.data.token);
                 localStorage.setItem('user', JSON.stringify(res.data));
                 router.push('/');
+            } else {
+                console.error("Google Login: Backend returned no token", res.data);
+                setError('Backend Error: No authentication token received.');
             }
         } catch (err: any) {
-            setError('Google sign-in failed. Please try again.');
+            console.error('Google sign-in error detail:', err);
+            const errorMsg = err.response?.data?.message || err.message || 'Verification failed';
+            setError(`Google sign-in failed: ${errorMsg}`);
         } finally {
             setGoogleLoading(false);
         }
     };
 
     const onGoogleError = () => {
+        console.error('Google Login: Popup was closed or failed at Google level');
         setError('Google sign-in was cancelled or failed.');
         setGoogleLoading(false);
     };
