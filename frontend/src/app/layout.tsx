@@ -21,7 +21,17 @@ export default function RootLayout({
         <meta name="theme-color" content="#16a34a" />
       </head>
       <body className={`${outfit.className} antialiased bg-slate-50 text-slate-900 selection:bg-green-500/20 selection:text-green-900`}>
-        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}>        
+        {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+          <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}>        
+            <LanguageProvider>
+              <OfflineSync />
+              <div className="max-w-md mx-auto min-h-screen bg-white shadow-[0_0_50px_-12px_rgba(0,0,0,0.1)] relative pb-28 overflow-x-hidden border-x border-gray-100/50">
+                {children}
+                <BottomNav />
+              </div>
+            </LanguageProvider>
+          </GoogleOAuthProvider>
+        ) : (
           <LanguageProvider>
             <OfflineSync />
             <div className="max-w-md mx-auto min-h-screen bg-white shadow-[0_0_50px_-12px_rgba(0,0,0,0.1)] relative pb-28 overflow-x-hidden border-x border-gray-100/50">
@@ -29,7 +39,7 @@ export default function RootLayout({
               <BottomNav />
             </div>
           </LanguageProvider>
-        </GoogleOAuthProvider>
+        )}
       </body>
     </html>
   );
