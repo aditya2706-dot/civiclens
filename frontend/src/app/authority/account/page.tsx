@@ -43,7 +43,7 @@ export default function AuthorityAccountPage() {
         router.push("/authority/login");
     };
 
-    if (loading) return <PremiumLoader label="Verifying clearance..." />;
+    if (loading) return <PremiumLoader message="Verifying clearance..." />;
 
     return (
         <main className="min-h-screen bg-slate-50 font-sans pb-32">
