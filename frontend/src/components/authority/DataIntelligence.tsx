@@ -26,16 +26,16 @@ export default function DataIntelligence({ reports }: { reports: any[] }) {
 
     // Process data for charts
     const categoryData = useMemo(() => {
-        const counts = {};
-        reports.forEach(r => {
+        const counts: Record<string, number> = {};
+        reports.forEach((r: any) => {
             counts[r.category] = (counts[r.category] || 0) + 1;
         });
         return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
     }, [reports]);
 
     const statusData = useMemo(() => {
-        const counts = {};
-        reports.forEach(r => {
+        const counts: Record<string, number> = {};
+        reports.forEach((r: any) => {
             counts[r.status] = (counts[r.status] || 0) + 1;
         });
         return Object.entries(counts).map(([name, value]) => ({ name, value }));

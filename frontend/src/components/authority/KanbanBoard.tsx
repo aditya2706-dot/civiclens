@@ -3,15 +3,15 @@ import { motion } from 'framer-motion';
 import { Clock, CheckCircle, Navigation, MapPin, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
-export default function KanbanBoard({ reports, handleStatusUpdate }) {
+export default function KanbanBoard({ reports, handleStatusUpdate }: { reports: any[], handleStatusUpdate: (id: string, status: string) => void }) {
     const columns = [
         { id: 'Pending', label: 'Pending Review', color: 'bg-slate-100', borderColor: 'border-slate-200' },
         { id: 'In Progress', label: 'In Progress', color: 'bg-blue-50', borderColor: 'border-blue-200' },
         { id: 'Resolved', label: 'Resolved / Fixed', color: 'bg-emerald-50', borderColor: 'border-emerald-200' }
     ];
 
-    const getColumnReports = (statusId) => {
-        return reports.filter(r => {
+    const getColumnReports = (statusId: string) => {
+        return reports.filter((r: any) => {
             if (statusId === 'Pending') return !r.status || r.status === 'Pending' || r.status === 'Under Review';
             return r.status === statusId;
         });
