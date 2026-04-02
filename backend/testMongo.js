@@ -1,18 +1,22 @@
-const mongoose = require('mongoose');
 require('dotenv').config();
-const Report = require('./src/models/Report');
+const mongoose = require('mongoose');
 
 (async () => {
     try {
         console.log("Connecting...");
-        await mongoose.connect(process.env.MONGODB_URI);
+        const uri = process.env.MONGODB_URI;
+        await mongoose.connect(uri, { 
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 5000
+        });
         console.log("Connected.");
         console.log("Querying...");
-        const reports = await Report.find({}).limit(1).lean();
-        console.log("Got reports:", reports.length);
+        const Report = require('./src/models/Report');
+        const count = await Report.countDocuments().maxTimeMS(5000);
+        console.log("Got count:", count);
         process.exit(0);
     } catch (err) {
-        console.error("Error:", err);
+        console.error("MongoDB Error:", err);
         process.exit(1);
     }
 })();

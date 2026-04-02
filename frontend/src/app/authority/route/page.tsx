@@ -13,6 +13,7 @@ const AuthorityRouteMap = dynamic(() => import("@/components/AuthorityRouteMap")
 
 export default function RoutePlannerPage() {
     const router = useRouter();
+    const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [locating, setLocating] = useState(true);
     const [route, setRoute] = useState<any[]>([]);
@@ -20,50 +21,77 @@ export default function RoutePlannerPage() {
 
     useEffect(() => {
         const initializeRoute = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) return router.push('/login');
+            const token = localStorage.getItem('token');
+            if (!token) return router.push('/login');
 
-                // 1. Fetch assigned reports
+            try {
+                // 1. Verify Official Identity
+                const profileRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (profileRes.data.role !== "authority" && profileRes.data.role !== "admin") {
+                    router.push("/settings");
+                    return;
+                }
+                setUser(profileRes.data);
+
+                // 2. Fetch assigned reports
                 const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/authority`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 
-                // 2. Get high accuracy GPS
+                // 3. Get high accuracy GPS
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         (position) => {
-                            const current = { lat: position.coords.latitude, lng: position.coords.longitude };
-                            setCurrentLocation(current);
-                            setLocating(false);
+                            const currentLoc = { lat: position.coords.latitude, lng: position.coords.longitude };
+                            setCurrentLocation(currentLoc);
                             
-                            // 3. Optimize the route
-                            const optimized = optimizeRoute(current, res.data);
+                            const optimized = optimizeRoute(currentLoc, res.data);
                             setRoute(optimized);
-                            setLoading(false);
-                        },
-                        (error) => {
-                            console.warn("GPS failed, using ward center.", error);
-                            // Fallback to City Center
-                            const fallback = { lat: 28.6139, lng: 77.2090 };
-                            setCurrentLocation(fallback);
+                            
                             setLocating(false);
-                            setRoute(optimizeRoute(fallback, res.data));
                             setLoading(false);
                         },
-                        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                        (geoError) => {
+                            console.error("GPS Error", geoError);
+                            setLocating(false);
+                            setLoading(false);
+                            alert("Failed to access your precise location. Ensure GPS permissions are granted for route calculation.");
+                        },
+                        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
                     );
+                } else {
+                    setLocating(false);
+                    setLoading(false);
+                    alert("Geolocation is not supported by your browser.");
                 }
                 
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Route generation failed", error);
-                setLoading(false);
-                setLocating(false);
+                if (error?.response?.status === 401) {
+                    localStorage.removeItem("token");
+                    router.push("/login");
+                } else {
+                    setLoading(false);
+                    setLocating(false);
+                }
             }
         };
 
         initializeRoute();
     }, [router]);
+
+    if (!user) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white px-6 text-center">
+                <Loader2 className="w-12 h-12 text-green-500 animate-spin mb-6" />
+                <h2 className="text-xl font-black uppercase tracking-widest mb-2">Authenticating Portal...</h2>
+                <p className="text-slate-500 text-sm">Verifying secure credentials for mission HQ.</p>
+            </div>
+        );
+    }
 
     if (locating) {
         return (
@@ -76,9 +104,9 @@ export default function RoutePlannerPage() {
     }
 
     return (
-        <main className="h-screen flex flex-col bg-gray-50 overflow-hidden relative font-sans print:h-auto print:overflow-visible">
-            {/* Map Area (Top 50%) */}
-            <div className="h-1/2 w-full relative print:hidden">
+        <main className="h-screen flex flex-col md:flex-row bg-gray-50 overflow-hidden relative font-sans print:h-auto print:overflow-visible print:block">
+            {/* Map Area */}
+            <div className="h-1/2 md:h-full w-full md:w-1/2 relative print:hidden">
                 {currentLocation && <AuthorityRouteMap currentLocation={currentLocation} route={route} /> }
                 
                 {/* Floating Back Button */}
@@ -96,12 +124,12 @@ export default function RoutePlannerPage() {
                 </div>
             </div>
 
-            {/* Bottom Sheet Itinerary (Bottom 50%) */}
-            <div className="h-1/2 w-full bg-white rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] -mt-6 z-[500] relative flex flex-col print:h-auto print:rounded-none print:shadow-none print:-mt-0">
-                <div className="p-6 pb-2 border-b border-gray-100 flex-shrink-0 flex justify-between items-end print:border-b-2">
+            {/* Itinerary Section */}
+            <div className="h-1/2 md:h-full w-full md:w-1/2 bg-white rounded-t-[32px] md:rounded-none md:rounded-l-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-[-10px_0_40px_rgba(0,0,0,0.1)] -mt-6 md:-mt-0 md:-ml-6 z-[500] relative flex flex-col print:h-auto print:rounded-none print:shadow-none print:w-full print:ml-0">
+                <div className="p-6 md:p-8 pb-4 border-b border-gray-100 flex-shrink-0 flex justify-between flex-wrap gap-4 items-end print:border-b-2">
                     <div>
-                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-6 print:hidden" />
-                        <h2 className="text-2xl font-black text-gray-800 tracking-tight">Today's Itinerary</h2>
+                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-6 print:hidden md:hidden" />
+                        <h2 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight">Today's Itinerary</h2>
                         <p className="text-sm font-medium text-gray-500 italic mt-1">
                             {route.length} stops strategically ordered from your location.
                         </p>

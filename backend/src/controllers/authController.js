@@ -234,9 +234,10 @@ const verifyOtp = async (req, res) => {
                 username: username,
                 email: email,
                 password: password,
-                role: 'authority',
+                role: official.role || 'authority',
                 department: official.department,
-                ward: official.ward
+                ward: official.ward,
+                managedBy: official.addedBy
             });
         }
 
@@ -395,6 +396,65 @@ const googleAuth = async (req, res) => {
     }
 };
 
+// @desc    Pre-authorize a new official (Admin or Supervisor only)
+// @route   POST /api/auth/add-official
+// @access  Private/Official
+const addOfficial = async (req, res) => {
+    const { phone, ward, department, role } = req.body;
+
+    try {
+        // Permission Check: Supervisor can only add staff to their own ward
+        if (req.user.role === 'supervisor' && ward !== req.user.ward) {
+            return res.status(403).json({ message: 'Supervisors can only authorize staff for their own ward.' });
+        }
+
+        const exists = await OfficialDirectory.findOne({ phone });
+        if (exists) {
+            return res.status(400).json({ message: 'Official with this phone is already authorized.' });
+        }
+
+        const official = await OfficialDirectory.create({
+            phone,
+            ward,
+            department,
+            role: role || 'authority',
+            addedBy: req.user._id
+        });
+
+        res.status(201).json(official);
+    } catch (error) {
+        res.status(500).json({ message: 'Error authorizing official', error: error.message });
+    }
+};
+
+// @desc    Get staff managed by current supervisor
+// @route   GET /api/auth/staff
+// @access  Private/Official
+const getWardStaff = async (req, res) => {
+    try {
+        let query = {};
+        if (req.user.role === 'supervisor') {
+            query = { ward: req.user.ward };
+        } else if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied.' });
+        }
+
+        const staff = await User.find({ 
+            role: { $in: ['authority', 'supervisor'] },
+            ...query 
+        }).select('-password');
+
+        const pending = await OfficialDirectory.find({ 
+            isRegistered: false,
+            ...query 
+        });
+
+        res.json({ registered: staff, pending });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching staff', error: error.message });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -406,4 +466,6 @@ module.exports = {
     forgotPassword,
     resetPassword,
     googleAuth,
+    addOfficial,
+    getWardStaff,
 };

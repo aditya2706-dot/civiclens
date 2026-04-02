@@ -100,13 +100,26 @@ const reportSchema = new mongoose.Schema({
         text: { type: String, required: true },
         isAuthority: { type: Boolean, default: false },
         createdAt: { type: Date, default: Date.now }
+    }],
+    assignedTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    internalNotes: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        text: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now }
     }]
 }, { timestamps: true });
 
 // Performance Indexes for high-frequency queries and dashboard polling
+reportSchema.index({ createdAt: -1 }); // Global recent queries
+reportSchema.index({ userId: 1, createdAt: -1 }); // Citizen personal reports
 reportSchema.index({ isDuplicateOf: 1, createdAt: -1 });
 reportSchema.index({ status: 1, createdAt: -1 });
-reportSchema.index({ department: 1, ward: 1 });
+reportSchema.index({ department: 1, ward: 1, createdAt: -1 }); // Authority dashboard queries
 reportSchema.index({ category: 1, status: 1 });
+reportSchema.index({ "location.lat": 1, "location.lng": 1 }); // Map queries fallback
 
 module.exports = mongoose.model('Report', reportSchema);

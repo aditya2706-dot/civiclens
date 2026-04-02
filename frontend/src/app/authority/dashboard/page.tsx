@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { LogOut, MapPin, AlertTriangle, CheckCircle, Clock, FileText, CheckCircle2, Clock3, X, Key, Image as ImageIcon, IndianRupee, HardHat, Megaphone, Navigation } from "lucide-react";
+import { LogOut, MapPin, AlertTriangle, CheckCircle, Clock, FileText, CheckCircle2, Clock3, X, Key, Image as ImageIcon, IndianRupee, HardHat, Megaphone, Navigation, ShieldCheck, PieChart, LayoutDashboard, Send, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import NotificationBell from "@/components/NotificationBell";
 import Link from "next/link";
 import PremiumLoader from "@/components/PremiumLoader";
+import StaffManagement from "@/components/StaffManagement";
+import DataIntelligence from "@/components/authority/DataIntelligence";
+import KanbanBoard from "@/components/authority/KanbanBoard";
+import { Users } from "lucide-react";
 
 export default function AuthorityDashboard() {
     const router = useRouter();
@@ -26,6 +30,14 @@ export default function AuthorityDashboard() {
     const [broadcastData, setBroadcastData] = useState({ title: '', message: '', activeHours: 24 });
     const [isBroadcasting, setIsBroadcasting] = useState(false);
 
+    // Tab State
+    const [activeTab, setActiveTab] = useState<"ops" | "staff" | "analytics">("ops");
+    const [opsView, setOpsView] = useState<"list" | "kanban">("list");
+    
+    // Internal Ops State
+    const [staffList, setStaffList] = useState<any[]>([]);
+    const [internalNoteInputs, setInternalNoteInputs] = useState<{[key: string]: string}>({});
+
     useEffect(() => {
         const fetchDashboardData = async () => {
             const token = localStorage.getItem("token");
@@ -35,6 +47,15 @@ export default function AuthorityDashboard() {
             }
 
             try {
+                // Check cache for instant load
+                const cachedDocs = sessionStorage.getItem("authority_reports");
+                const cachedUser = sessionStorage.getItem("authority_user");
+                if (cachedDocs && cachedUser) {
+                    setReports(JSON.parse(cachedDocs));
+                    setUser(JSON.parse(cachedUser));
+                    setLoading(false);
+                }
+
                 // Verify Profile
                 const profileRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
                     headers: { Authorization: `Bearer ${token}` }
@@ -52,6 +73,25 @@ export default function AuthorityDashboard() {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setReports(reportsRes.data);
+                try {
+                    // Only cache the top 15 reports to prevent sessionStorage QuotaExceededError from massive base64 image strings
+                    sessionStorage.setItem("authority_reports", JSON.stringify(reportsRes.data.slice(0, 15)));
+                    sessionStorage.setItem("authority_user", JSON.stringify(profileRes.data));
+                } catch (e) {
+                    console.warn("SessionStorage quota exceeded, skipping local caching.", e);
+                }
+
+                // Fetch Staff list for assignment dropdown
+                if (profileRes.data.role === 'admin' || profileRes.data.role === 'supervisor') {
+                    try {
+                        const staffRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/staff`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        setStaffList(staffRes.data.registered || []);
+                    } catch(e) {
+                         console.error("Staff fetch failed", e);
+                    }
+                }
 
             } catch (error: any) {
                 console.error("Failed to load dashboard data", error);
@@ -124,6 +164,38 @@ export default function AuthorityDashboard() {
         }
     };
 
+    const handleAssign = async (id: string, assignedUserId: string) => {
+        try {
+            const token = localStorage.getItem("token");
+            const res = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/assign`, {
+                assignedTo: assignedUserId
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            
+            setReports(reports.map(r => r._id === id ? { ...r, assignedTo: res.data.assignedTo, status: res.data.status } : r));
+        } catch (error) {
+            console.error(error);
+            alert("Failed to assign");
+        }
+    };
+
+    const handleAddNote = async (id: string) => {
+        const text = internalNoteInputs[id];
+        if (!text || !text.trim()) return;
+        
+        try {
+            const token = localStorage.getItem("token");
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/${id}/internal-notes`, {
+                text
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            
+            setReports(reports.map(r => r._id === id ? { ...r, internalNotes: res.data } : r));
+            setInternalNoteInputs(prev => ({...prev, [id]: ''}));
+        } catch (error) {
+            console.error(error);
+            alert("Failed to add note");
+        }
+    };
+
     const formatDuplicateCount = (count: number) => {
         const total = count + 1;
         return total > 1 ? `${total} INCIDENTS` : `${total} INCIDENT`;
@@ -158,25 +230,11 @@ export default function AuthorityDashboard() {
     };
 
     if (loading) {
-        return <PremiumLoader message="Authenticating Authority Portal..." />;
+        return <PremiumLoader message="Verifying Official Identity..." />;
     }
 
-    if (error) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 px-6">
-                <div className="w-16 h-16 rounded-3xl bg-red-50 border border-red-100 flex items-center justify-center">
-                    <AlertTriangle size={28} className="text-red-500" />
-                </div>
-                <h2 className="text-xl font-black text-slate-800">Connection Failed</h2>
-                <p className="text-slate-500 text-sm text-center max-w-xs">{error}</p>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="mt-2 px-6 py-3 bg-slate-900 text-white font-bold rounded-2xl text-sm"
-                >
-                    Try Again
-                </button>
-            </div>
-        );
+    if (!user) {
+        return null; // Will redirect via useEffect
     }
 
     const totalReports = reports.length;
@@ -187,11 +245,20 @@ export default function AuthorityDashboard() {
     return (
         <main className="min-h-screen bg-slate-50 pb-28 relative font-sans">
             {/* Header */}
-            <header className="bg-slate-900 pb-24 text-white p-6 pt-12 rounded-b-[3rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.2)] relative z-0">
-                <div className="flex justify-between items-center mb-6">
+            <header className="bg-slate-950 pb-32 md:pb-40 text-white p-6 pt-12 md:p-12 md:pt-16 rounded-b-[2rem] shadow-2xl relative z-0 border-b border-white/5">
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
                     <div>
-                        <h1 className="text-4xl font-black tracking-tight bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">Authority Portal</h1>
-                        <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em] mt-2 opacity-80">Connected City Governance • {user?.name}</p>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center border border-green-500/30">
+                                <ShieldCheck className="text-green-500" size={18} />
+                            </div>
+                            <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white uppercase italic">Command Center</h1>
+                        </div>
+                        <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] opacity-80 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                            Secure Operator Session • {user?.name}
+                        </p>
                     </div>
                     <div className="flex items-center gap-3">
                         <motion.button 
@@ -228,39 +295,43 @@ export default function AuthorityDashboard() {
                         <span className="text-[10px] font-bold tracking-widest uppercase text-slate-300">Ward: <span className="text-white">{user?.ward || "City-wide"}</span></span>
                     </div>
                 </div>
+                </div>
             </header>
 
             {/* Premium Vercel-Style Stats Overview */}
-            <div className="max-w-4xl mx-auto px-6 relative z-10 -top-16">
-                <div className="grid grid-cols-3 gap-4">
-                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="premium-card p-6 flex flex-col text-left group hover:scale-[1.02] transition-transform">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-9 h-9 rounded-2xl bg-blue-50/50 flex items-center justify-center text-blue-600 border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-500">
-                                <FileText size={16} strokeWidth={2.5} />
+            <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10 -top-24">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-slate-900 border border-white/5 p-5 md:p-8 flex flex-col text-left group hover:bg-slate-800 transition-all rounded-3xl shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                                <FileText size={14} strokeWidth={2.5} />
                             </div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reports</span>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest hidden sm:inline">Total Load</span>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest sm:hidden">Load</span>
                         </div>
-                        <p className="text-4xl font-black text-slate-900 tracking-tighter">{totalReports}</p>
+                        <p className="text-3xl md:text-5xl font-black text-white tracking-tighter">{totalReports}</p>
                     </motion.div>
                     
-                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="premium-card p-6 flex flex-col text-left group hover:scale-[1.02] transition-transform">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-9 h-9 rounded-2xl bg-amber-50/50 flex items-center justify-center text-amber-600 border border-amber-100 group-hover:bg-amber-500 group-hover:text-white transition-colors duration-500">
-                                <Clock3 size={16} strokeWidth={2.5} />
+                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="bg-slate-900 border border-white/5 p-5 md:p-8 flex flex-col text-left group hover:bg-slate-800 transition-all rounded-3xl shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20">
+                                <Clock3 size={14} strokeWidth={2.5} />
                             </div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active</span>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest hidden sm:inline">Active Tasks</span>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest sm:hidden">Active</span>
                         </div>
-                        <p className="text-4xl font-black text-slate-900 tracking-tighter">{pendingReports}</p>
+                        <p className="text-3xl md:text-5xl font-black text-amber-400 tracking-tighter">{pendingReports}</p>
                     </motion.div>
                     
-                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="premium-card p-6 flex flex-col text-left group hover:scale-[1.02] transition-transform">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-9 h-9 rounded-2xl bg-emerald-50/50 flex items-center justify-center text-emerald-600 border border-emerald-100 group-hover:bg-emerald-500 group-hover:text-white transition-colors duration-500">
-                                <CheckCircle2 size={16} strokeWidth={2.5} />
+                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="bg-slate-900 border border-white/5 p-5 md:p-8 flex flex-col text-left group hover:bg-slate-800 transition-all rounded-3xl shadow-2xl col-span-2 md:col-span-1">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                                <CheckCircle2 size={14} strokeWidth={2.5} />
                             </div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resolved</span>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest hidden sm:inline">Resolved</span>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest sm:hidden">Fixed</span>
                         </div>
-                        <p className="text-4xl font-black text-slate-900 tracking-tighter">{resolvedReports}</p>
+                        <p className="text-3xl md:text-5xl font-black text-emerald-400 tracking-tighter">{resolvedReports}</p>
                     </motion.div>
                 </div>
 
@@ -289,149 +360,251 @@ export default function AuthorityDashboard() {
                 </div>
             </div>
 
-            {/* Reports List */}
-            <div className="max-w-3xl mx-auto p-4 mt-2 space-y-4">
-                <h2 className="text-xl font-bold text-gray-800 mb-4 px-2">Assigned Issues</h2>
-
-                {reports.length === 0 ? (
-                    <div className="bg-white rounded-3xl p-8 text-center border border-gray-100 shadow-sm">
-                        <CheckCircle size={48} className="mx-auto text-green-500 mb-4" />
-                        <h3 className="text-lg font-bold text-gray-800">All Clear!</h3>
-                        <p className="text-gray-500 text-sm">There are no pending reports assigned to your jurisdiction.</p>
-                    </div>
-                ) : (
-                    reports.map((report) => (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.98, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            whileHover={{ y: -4 }}
-                            transition={{ duration: 0.3 }}
-                            key={report._id}
-                            className="bg-white rounded-[2rem] overflow-hidden shadow-[0_10px_40px_-15px_rgba(0,0,0,0.08)] border border-slate-100/80 flex flex-col md:flex-row group transition-all"
+            {/* Tabs (Only for Admin/Supervisor) */}
+            {(user?.role === 'admin' || user?.role === 'supervisor') && (
+                <div className="max-w-7xl mx-auto px-4 md:px-8 mt-4">
+                    <div className="bg-white border border-gray-100 p-1 rounded-2xl flex shadow-sm max-w-lg">
+                        <button 
+                            onClick={() => setActiveTab("analytics")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'analytics' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
                         >
-                            <div className="w-full md:w-56 h-56 md:h-auto shrink-0 relative overflow-hidden bg-slate-100">
-                                <img src={report.imageUrl} alt="Issue" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                            <PieChart size={14} />
+                            Analytics
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab("ops")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'ops' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <FileText size={14} />
+                            Live Ops
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab("staff")}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'staff' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <Users size={14} />
+                            Personnel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "analytics" ? (
+                <div className="max-w-7xl mx-auto px-4 md:px-8 mt-6">
+                    <DataIntelligence reports={reports} />
+                </div>
+            ) : activeTab === "ops" ? (
+                <>
+                    {/* Reports List */}
+                    <div className="max-w-7xl mx-auto px-4 md:px-8 mt-6 space-y-4">
+                        <div className="flex justify-between items-center mb-6 px-2 flex-wrap gap-4">
+                            <h2 className="text-xl md:text-2xl font-black text-slate-800">Assigned Issues ({pendingReports} Pending)</h2>
+                            <div className="flex bg-white rounded-xl border border-gray-100 p-1">
+                                <button onClick={() => setOpsView("list")} className={`px-4 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-colors ${opsView === 'list' ? 'bg-slate-100 text-slate-800' : 'text-slate-400'}`}>List</button>
+                                <button onClick={() => setOpsView("kanban")} className={`px-4 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-colors flex items-center gap-1 ${opsView === 'kanban' ? 'bg-slate-100 text-slate-800' : 'text-slate-400'}`}><LayoutDashboard size={12}/> Board</button>
                             </div>
-                            <div className="p-5 flex-1 flex flex-col">
-                                <div className="flex justify-between items-start mb-3 flex-wrap gap-2">
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className={`px-3 py-1 text-[8px] uppercase tracking-[0.15em] font-black rounded-lg border ${report.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                report.status === 'In Progress' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                                    'bg-amber-50 text-amber-600 border-amber-100'
-                                            }`}>
-                                            {report.status || "Pending"}
-                                        </span>
-                                        {report.isEscalated && (
-                                            <span className="px-3 py-1 text-[8px] tracking-[0.15em] font-black rounded-lg bg-red-500 text-white animate-pulse shadow-sm flex items-center gap-1">
-                                                <AlertTriangle size={10} /> CRITICAL
-                                            </span>
-                                        )}
-                                        {report.duplicateCount > 0 && (
-                                            <span className="px-3 py-1 text-[8px] tracking-[0.15em] font-black text-purple-600 bg-purple-50 rounded-lg flex items-center gap-1 border border-purple-100">
-                                                🔥 {formatDuplicateCount(report.duplicateCount)}
-                                            </span>
-                                        )}
-                                   </div>
-                                </div>
+                        </div>
 
-                                <h3 className="text-xl font-black text-slate-800 tracking-tight leading-none mb-1.5 capitalize">{report.category}</h3>
-                                <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1 leading-relaxed">{report.description || report.aiSummary}</p>
+                        {opsView === "kanban" ? (
+                            <KanbanBoard reports={reports} handleStatusUpdate={handleStatusUpdate} />
+                        ) : reports.length === 0 ? (
+                            <div className="bg-white rounded-3xl p-8 text-center border border-gray-100 shadow-sm max-w-2xl mx-auto">
+                                <CheckCircle size={56} className="mx-auto text-green-500 mb-4" />
+                                <h3 className="text-xl font-black text-slate-800">All Clear!</h3>
+                                <p className="text-slate-500 text-sm mt-2">There are no pending reports assigned to your jurisdiction.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {reports.map((report) => (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.98, y: 20 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        whileHover={{ y: -4 }}
+                                        transition={{ duration: 0.3 }}
+                                        key={report._id}
+                                        className="bg-white rounded-[2rem] overflow-hidden shadow-[0_10px_40px_-15px_rgba(0,0,0,0.08)] border border-slate-100/80 flex flex-col group transition-all"
+                                    >
+                                        <div className="w-full h-56 xl:h-64 shrink-0 relative overflow-hidden bg-slate-100 block">
+                                            <img src={report.imageUrl} alt="Issue" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                            <Link href={`/authority/reports/${report._id}`} className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-indigo-600 shadow-xl hover:bg-white border border-white/20 transition-all flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0">
+                                                Open Dossier <ArrowRight size={12} />
+                                            </Link>
+                                        </div>
+                                        <div className="p-5 flex-1 flex flex-col">
+                                            <div className="flex justify-between items-start mb-3 flex-wrap gap-2">
+                                                <div className="flex flex-wrap gap-2">
+                                                    <span className={`px-3 py-1 text-[8px] uppercase tracking-[0.15em] font-black rounded-lg border ${report.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                            report.status === 'In Progress' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                                'bg-amber-50 text-amber-600 border-amber-100'
+                                                        }`}>
+                                                        {report.status || "Pending"}
+                                                    </span>
+                                                    {report.isEscalated && (
+                                                        <span className="px-3 py-1 text-[8px] tracking-[0.15em] font-black rounded-lg bg-red-500 text-white animate-pulse shadow-sm flex items-center gap-1">
+                                                            <AlertTriangle size={10} /> CRITICAL
+                                                        </span>
+                                                    )}
+                                                    {report.duplicateCount > 0 && (
+                                                        <span className="px-3 py-1 text-[8px] tracking-[0.15em] font-black text-purple-600 bg-purple-50 rounded-lg flex items-center gap-1 border border-purple-100">
+                                                            🔥 {formatDuplicateCount(report.duplicateCount)}
+                                                        </span>
+                                                    )}
+                                               </div>
+                                            </div>
 
-                                <div className="flex flex-wrap items-center text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-4 gap-x-4 gap-y-2">
-                                    <span className="flex items-center gap-1"><MapPin size={12} /> {report.ward || "Unknown Ward"}</span>
-                                    <span className="flex items-center gap-1"><Clock size={12} /> {new Date(report.createdAt).toLocaleDateString()}</span>
-                                    {report.deadline && (
-                                        <span className={`flex items-center gap-1 ${report.isEscalated ? 'text-red-500' : 'text-amber-500'}`}>
-                                            <Clock3 size={12} /> Due: {new Date(report.deadline).toLocaleDateString()}
-                                        </span>
-                                    )}
-                                    {report.estimatedCost && report.estimatedCost > 0 ? (
-                                        <span className="flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 shadow-sm">
-                                            <IndianRupee size={12} /> {report.estimatedCost.toLocaleString('en-IN')}
-                                        </span>
-                                    ) : null}
-                                    {report.estimatedResources && report.estimatedResources !== "Unknown" ? (
-                                        <span className="flex items-center gap-1 text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100 shadow-sm">
-                                            <HardHat size={12} /> {report.estimatedResources}
-                                        </span>
-                                    ) : null}
-                                    {report.location?.lat && report.location?.lng && (
-                                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${report.location.lat},${report.location.lng}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded-md border border-blue-100 shadow-sm hover:bg-blue-100 transition-colors">
-                                            <Navigation size={12} /> Get Directions
-                                        </a>
-                                    )}
-                                </div>
+                                            <h3 className="text-xl font-black text-slate-800 tracking-tight leading-none mb-1.5 capitalize">{report.category}</h3>
+                                            <p className="text-xs text-slate-500 font-medium line-clamp-2 mb-4 flex-1 leading-relaxed">{report.description || report.aiSummary}</p>
 
-                                {/* Authority Action: Status Update and Transfer */}
-                                <div className="mt-auto pt-5 border-t border-slate-50 flex flex-col gap-4">
-                                    <div className="flex items-center justify-between flex-wrap gap-4">
-                                        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Lifecycle Status</span>
-                                            <div className="relative">
-                                                <select
-                                                    value={report.status}
-                                                    onChange={(e) => {
-                                                        if (e.target.value !== "Resolved") {
-                                                            handleStatusUpdate(report._id, e.target.value);
-                                                        }
-                                                    }}
-                                                    className="w-full bg-slate-50 border border-slate-200 text-[11px] font-bold rounded-xl px-4 py-2.5 text-slate-700 appearance-none focus:ring-2 focus:ring-green-500/20 outline-none cursor-pointer hover:bg-slate-100 transition-colors"
-                                                >
-                                                    <option value="Pending">Pending Review</option>
-                                                    <option value="In Progress">In Progress</option>
-                                                    <option value="Resolved" disabled>Requires Resolution Proof</option>
-                                                </select>
-                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                                    <Clock size={12} />
+                                            <div className="flex flex-wrap items-center text-[10px] uppercase tracking-wider text-slate-500 font-black mb-4 gap-x-4 gap-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                <span className="flex items-center gap-1"><MapPin size={12} className="text-blue-500" /> {report.ward || "Zone Alpha"}</span>
+                                                <span className="flex items-center gap-1"><Clock size={12} className="text-slate-400" /> {new Date(report.createdAt).toLocaleDateString()}</span>
+                                                {report.deadline && (
+                                                    <span className={`flex items-center gap-1 ${report.isEscalated ? 'text-red-500' : 'text-amber-600'}`}>
+                                                        <Clock3 size={12} /> {new Date(report.deadline).toLocaleDateString()}
+                                                    </span>
+                                                )}
+                                                {report.estimatedCost && report.estimatedCost > 0 ? (
+                                                    <span className="flex items-center gap-1 text-emerald-700 font-black">
+                                                        <IndianRupee size={12} /> {report.estimatedCost.toLocaleString('en-IN')}
+                                                    </span>
+                                                ) : null}
+                                                {report.location?.lat && report.location?.lng && (
+                                                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${report.location.lat},${report.location.lng}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 font-bold hover:underline transition-colors ml-auto">
+                                                        <Navigation size={12} /> Route
+                                                    </a>
+                                                )}
+                                            </div>
+
+                                            {/* Authority Action: Status Update and Transfer */}
+                                            <div className="mt-auto pt-5 border-t border-slate-50 flex flex-col gap-4">
+                                                <div className="flex items-center justify-between flex-wrap gap-4">
+                                                    <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Lifecycle Status</span>
+                                                        <div className="relative">
+                                                            <select
+                                                                value={report.status}
+                                                                onChange={(e) => {
+                                                                    if (e.target.value !== "Resolved") {
+                                                                        handleStatusUpdate(report._id, e.target.value);
+                                                                    }
+                                                                }}
+                                                                className="w-full bg-slate-50 border border-slate-200 text-[11px] font-bold rounded-xl px-4 py-2.5 text-slate-700 appearance-none focus:ring-2 focus:ring-green-500/20 outline-none cursor-pointer hover:bg-slate-100 transition-colors"
+                                                            >
+                                                                <option value="Pending">Pending Review</option>
+                                                                <option value="In Progress">In Progress</option>
+                                                                <option value="Resolved" disabled>Requires Resolution Proof</option>
+                                                            </select>
+                                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                                <Clock size={12} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Department Route</span>
+                                                        <div className="relative">
+                                                            <select
+                                                                value={report.department || ""}
+                                                                onChange={(e) => handleTransfer(report._id, e.target.value)}
+                                                                className="w-full bg-slate-50 border border-slate-200 text-[11px] font-bold rounded-xl px-4 py-2.5 text-slate-700 appearance-none focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer hover:bg-slate-100 transition-colors"
+                                                            >
+                                                                <option value="Sanitation">Sanitation</option>
+                                                                <option value="Roads & Infrastructure">Roads & Infra</option>
+                                                                <option value="Water & Sewage">Water & Sewage</option>
+                                                                <option value="Electricity">Electricity</option>
+                                                                <option value="Traffic & Enforcement">Traffic</option>
+                                                                <option value="Parks & Horticulture">Parks & Hort</option>
+                                                            </select>
+                                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                                <Navigation size={12} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Assign Official</span>
+                                                        <div className="relative">
+                                                            <select
+                                                                value={report.assignedTo?._id || report.assignedTo || ""}
+                                                                onChange={(e) => handleAssign(report._id, e.target.value)}
+                                                                className="w-full bg-slate-50 border border-slate-200 text-[11px] font-bold rounded-xl px-4 py-2.5 text-slate-700 appearance-none focus:ring-2 focus:ring-indigo-500/20 outline-none cursor-pointer hover:bg-slate-100 transition-colors"
+                                                            >
+                                                                <option value="">Unassigned</option>
+                                                                {staffList.map(staff => (
+                                                                    <option key={staff._id} value={staff._id}>{staff.name} - {staff.role}</option>
+                                                                ))}
+                                                            </select>
+                                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                                <Users size={12} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
+
+                                                {/* Internal Notes Section */}
+                                                <div className="mt-4 pt-4 border-t border-slate-100">
+                                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-2">
+                                                            <FileText size={10} /> Internal Operational Notes
+                                                        </h4>
+                                                        <div className="space-y-2 mb-3 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+                                                            {report.internalNotes && report.internalNotes.length > 0 ? report.internalNotes.map((note: any, idx: number) => (
+                                                                <div key={idx} className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+                                                                    <p className="text-[11px] text-slate-700 font-medium">{note.text}</p>
+                                                                    <p className="text-[8px] uppercase tracking-widest text-slate-400 mt-1 font-bold">
+                                                                        {note.user?.name || 'Authority'} • {new Date(note.createdAt).toLocaleDateString()}
+                                                                    </p>
+                                                                </div>
+                                                            )) : <p className="text-[10px] text-slate-400 italic">No internal notes yet.</p>}
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <input 
+                                                                type="text"
+                                                                className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-slate-400"
+                                                                placeholder="Add tactical note..."
+                                                                value={internalNoteInputs[report._id] || ''}
+                                                                onChange={(e) => setInternalNoteInputs({...internalNoteInputs, [report._id]: e.target.value})}
+                                                                onKeyDown={(e) => e.key === 'Enter' && handleAddNote(report._id)}
+                                                            />
+                                                            <button 
+                                                                onClick={() => handleAddNote(report._id)}
+                                                                className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 transition-colors"
+                                                            >
+                                                                <Send size={12} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {report.status !== "Resolved" && (
+                                                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 border-dashed">
+                                                        <span className="text-xs font-semibold text-gray-500 uppercase">Mark Resolved</span>
+                                                        <button 
+                                                            onClick={() => setResolvingReport(report)}
+                                                            className="bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
+                                                        >
+                                                            <CheckCircle size={14} /> Resolve Ticket
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {report.status === "Resolved" && report.resolutionImageUrl && (
+                                                    <div className="mt-2 text-xs text-green-600 font-medium flex items-center justify-between border border-green-100 bg-green-50 px-3 py-2 rounded-lg">
+                                                        <span className="flex items-center gap-1"><CheckCircle size={14} /> Verified Fixed</span>
+                                                        <a href={report.resolutionImageUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold text-green-700">View Proof</a>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-
-                                        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Department Route</span>
-                                            <div className="relative">
-                                                <select
-                                                    value={report.department || ""}
-                                                    onChange={(e) => handleTransfer(report._id, e.target.value)}
-                                                    className="w-full bg-slate-50 border border-slate-200 text-[11px] font-bold rounded-xl px-4 py-2.5 text-slate-700 appearance-none focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer hover:bg-slate-100 transition-colors"
-                                                >
-                                                    <option value="Sanitation">Sanitation</option>
-                                                    <option value="Roads & Infrastructure">Roads & Infra</option>
-                                                    <option value="Water & Sewage">Water & Sewage</option>
-                                                    <option value="Electricity">Electricity</option>
-                                                    <option value="Traffic & Enforcement">Traffic</option>
-                                                    <option value="Parks & Horticulture">Parks & Hort</option>
-                                                </select>
-                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                                    <Navigation size={12} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {report.status !== "Resolved" && (
-                                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 border-dashed">
-                                            <span className="text-xs font-semibold text-gray-500 uppercase">Mark Resolved</span>
-                                            <button 
-                                                onClick={() => setResolvingReport(report)}
-                                                className="bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
-                                            >
-                                                <CheckCircle size={14} /> Resolve Ticket
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {report.status === "Resolved" && report.resolutionImageUrl && (
-                                        <div className="mt-2 text-xs text-green-600 font-medium flex items-center justify-between border border-green-100 bg-green-50 px-3 py-2 rounded-lg">
-                                            <span className="flex items-center gap-1"><CheckCircle size={14} /> Verified Fixed</span>
-                                            <a href={report.resolutionImageUrl} target="_blank" rel="noopener noreferrer" className="underline font-bold text-green-700">View Proof</a>
-                                        </div>
-                                    )}
-                                </div>
+                                    </motion.div>
+                                ))}
                             </div>
-                        </motion.div>
-                    ))
-                )}
-            </div>
+                        )}
+                    </div>
+                </>
+            ) : (
+                <div className="max-w-7xl mx-auto px-4 md:px-8 mt-6">
+                    <StaffManagement user={user} />
+                </div>
+            )}
 
             {/* Resolution Modal */}
             {resolvingReport && (

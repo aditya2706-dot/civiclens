@@ -3,7 +3,6 @@
 import { LanguageProvider } from "@/context/LanguageContext";
 import { Outfit } from "next/font/google";
 import "./globals.css";
-import BottomNav from "@/components/BottomNav";
 import OfflineSync from "@/components/OfflineSync";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
@@ -29,19 +28,13 @@ export default function RootLayout({
           <GoogleOAuthProvider clientId={cleanClientId}>        
             <LanguageProvider>
               <OfflineSync />
-              <div className="max-w-md mx-auto min-h-screen bg-white shadow-[0_0_50px_-12px_rgba(0,0,0,0.1)] relative pb-28 overflow-x-hidden border-x border-gray-100/50">
-                {children}
-                <BottomNav />
-              </div>
+              {children}
             </LanguageProvider>
           </GoogleOAuthProvider>
         ) : (
           <LanguageProvider>
             <OfflineSync />
-            <div className="max-w-md mx-auto min-h-screen bg-white shadow-[0_0_50px_-12px_rgba(0,0,0,0.1)] relative pb-28 overflow-x-hidden border-x border-gray-100/50">
-              {children}
-              <BottomNav />
-            </div>
+            {children}
           </LanguageProvider>
         )}
       </body>

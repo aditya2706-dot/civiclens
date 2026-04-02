@@ -122,21 +122,8 @@ export default function Login() {
                     <p className="text-gray-500">Welcome back! Sign in to continue your civic journey.</p>
                 </div>
 
-                <div className="flex bg-gray-200/50 p-1 rounded-2xl mb-8">
-                    <button
-                        type="button"
-                        onClick={() => setLoginType('citizen')}
-                        className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${loginType === 'citizen' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Citizen Portal
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setLoginType('authority')}
-                        className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${loginType === 'authority' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Government Portal
-                    </button>
+                <div className="text-center mb-8 border border-green-500/10 bg-green-500/5 py-4 rounded-2xl">
+                    <span className="text-[10px] font-black text-green-600 uppercase tracking-[0.2em]">Citizen Access Portal</span>
                 </div>
 
                 {error && (
@@ -220,21 +207,12 @@ export default function Login() {
                     </>
                 )}
 
-                {loginType === 'citizen' ? (
-                    <p className="text-center text-sm text-gray-500 mt-8">
-                        Don't have an account?{' '}
-                        <Link href="/register" className="font-bold text-green-600 hover:text-green-700 transition-colors">
-                            Sign up
-                        </Link>
-                    </p>
-                ) : (
-                    <div className="mt-8 text-center">
-                        <p className="text-sm text-gray-500 mb-2">First time logging into your official account?</p>
-                        <Link href="/authority-setup" className="font-bold text-green-600 hover:text-green-700 transition-colors bg-green-50 px-4 py-2 rounded-xl inline-block">
-                            Verify Phone & Set Password →
-                        </Link>
-                    </div>
-                )}
+                <p className="text-center text-sm text-gray-500 mt-8">
+                    Don't have an account?{' '}
+                    <Link href="/register" className="font-bold text-green-600 hover:text-green-700 transition-colors">
+                        Sign up
+                    </Link>
+                </p>
             </motion.div>
         </main>
     );

@@ -35,8 +35,12 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['citizen', 'authority', 'admin', 'user'],
+        enum: ['citizen', 'authority', 'supervisor', 'admin', 'user'],
         default: 'citizen',
+    },
+    managedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
     },
     department: {
         type: String,

@@ -17,6 +17,15 @@ const officialDirectorySchema = new mongoose.Schema({
     isRegistered: {
         type: Boolean,
         default: false
+    },
+    role: {
+        type: String,
+        enum: ['authority', 'supervisor'],
+        default: 'authority'
+    },
+    addedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
     }
 }, {
     timestamps: true

@@ -123,16 +123,24 @@ const submitReport = async (req, res) => {
         // Invalidate cache so the new report appears immediately
         clearCache();
 
-        // Feature: Push Notifications for High Severity
-        if (severity === 'High' && department) {
-            const authorities = await User.find({ role: 'authority', department: department });
-            const notifications = authorities.map(auth => ({
+        // Feature: Push Notifications for High Severity (Ward/Department Scope)
+        if (severity === 'High') {
+            const targetAuthorities = await User.find({ 
+                role: { $in: ['authority', 'supervisor'] },
+                $or: [
+                    { ward: ward },
+                    { department: department }
+                ]
+            });
+
+            const notifications = targetAuthorities.map(auth => ({
                 userId: auth._id,
                 reportId: report._id,
                 title: 'High Severity Alert 🚨',
-                message: `A critical ${category} issue was just reported in your department.`,
+                message: `A critical ${category} issue was just reported in ${ward || "your area"}.`,
                 type: 'NEW_REPORT'
             }));
+
             if (notifications.length > 0) {
                 await Notification.insertMany(notifications);
             }
@@ -619,7 +627,9 @@ module.exports = {
     addComment,
     translateReport,
     deleteReport,
-    getWardStats
+    getWardStats,
+    addInternalNote,
+    assignReport
 };
 
 // @desc    Delete a report
@@ -669,5 +679,69 @@ async function translateReport(req, res) {
         res.json({ translated });
     } catch (error) {
         res.status(500).json({ message: 'Translation failed', error: error.message });
+    }
+}
+
+// @desc    Add an internal note to a report
+// @route   POST /api/reports/:id/internal-notes
+// @access  Private (Admin/Authority/Supervisor)
+async function addInternalNote(req, res) {
+    try {
+        const { text } = req.body;
+        const report = await Report.findById(req.params.id);
+
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        // Only officials can add internal notes
+        if (!['admin', 'supervisor', 'authority'].includes(req.user.role)) {
+            return res.status(403).json({ message: 'Not authorized for internal ops' });
+        }
+
+        const newNote = {
+            user: req.user._id,
+            text
+        };
+
+        report.internalNotes.push(newNote);
+        await report.save();
+
+        const populatedReport = await Report.findById(req.params.id).populate('internalNotes.user', 'name role department');
+        res.status(201).json(populatedReport.internalNotes);
+    } catch (error) {
+        res.status(500).json({ message: 'Error adding internal note', error: error.message });
+    }
+}
+
+// @desc    Assign a report to a specific official
+// @route   PUT /api/reports/:id/assign
+// @access  Private (Admin/Supervisor)
+async function assignReport(req, res) {
+    try {
+        const { assignedTo } = req.body;
+        const report = await Report.findById(req.params.id);
+
+        if (!report) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        if (!['admin', 'supervisor'].includes(req.user.role)) {
+            return res.status(403).json({ message: 'Only supervisors and admins can assign tasks.' });
+        }
+
+        report.assignedTo = assignedTo;
+        
+        // When assigned, moving to In Progress makes sense
+        if(report.status === 'Pending') {
+            report.status = 'In Progress';
+        }
+
+        await report.save();
+
+        const populatedReport = await Report.findById(req.params.id).populate('assignedTo', 'name role phone');
+        res.status(200).json(populatedReport);
+    } catch (error) {
+        res.status(500).json({ message: 'Error assigning report', error: error.message });
     }
 }

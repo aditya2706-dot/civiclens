@@ -17,7 +17,9 @@ const {
     getReportsStats,
     getMapReports,
     transferReport,
-    rejectResolution
+    rejectResolution,
+    addInternalNote,
+    assignReport
 } = require('../controllers/reportController');
 const { protect, optionalAuth, admin, authority, adminOrAuthority } = require('../middlewares/authMiddleware');
 
@@ -48,10 +50,10 @@ router.route('/:id/comments').post(protect, addComment);
 router.route('/:id/translate').post(translateReport);
 router.route('/:id/reject').put(protect, rejectResolution);
 
-// Admin/Authority route to update status
+// Admin/Authority route to update status, ops
 router.route('/:id/status').put(protect, adminOrAuthority, updateReportStatus);
 router.route('/:id/transfer').put(protect, adminOrAuthority, transferReport);
-
-// Auth route to submit report as user (optional depending on frontend implementation, can just use the public one and pass JWT)
+router.route('/:id/internal-notes').post(protect, adminOrAuthority, addInternalNote);
+router.route('/:id/assign').put(protect, adminOrAuthority, assignReport);
 
 module.exports = router;
