@@ -164,7 +164,7 @@ const getReports = async (req, res) => {
             return res.json(cached);
         }
         
-        const reports = await Report.find({})
+        const reports = await Report.find({ isDuplicateOf: { $in: [null, undefined] } })
             .sort({ createdAt: -1 })
             .limit(30)
             .lean();
@@ -222,7 +222,8 @@ const getAuthorityReports = async (req, res) => {
             return res.json(cached);
         }
 
-        let query = { isDuplicateOf: null };
+        // Use $in to catch both explicitly null AND missing/undefined isDuplicateOf fields
+        let query = { isDuplicateOf: { $in: [null, undefined] } };
 
         // Build a flexible query: match by ward OR department to handle reports
         // that may only have one of these fields populated.
