@@ -224,7 +224,6 @@ const getMyReports = async (req, res) => {
 const getAuthorityReports = async (req, res) => {
     try {
         const { status } = req.query;
-        // Dynamically scope cache to the exact user context and query string
         const cacheKey = `auth_reports_${req.user._id}_${status || 'all'}`;
         
         const cached = getCache(cacheKey);
@@ -233,11 +232,8 @@ const getAuthorityReports = async (req, res) => {
             return res.json(cached);
         }
 
-        // Use $in to catch both explicitly null AND missing/undefined isDuplicateOf fields
         let query = { isDuplicateOf: { $in: [null, undefined] } };
 
-        // Build a flexible query: match by ward OR department to handle reports
-        // that may only have one of these fields populated.
         if (req.user.role !== 'admin') {
             const orClauses = [];
             if (req.user.ward && req.user.ward !== 'All Wards') {
@@ -253,19 +249,20 @@ const getAuthorityReports = async (req, res) => {
 
         if (status) query.status = status;
 
+        // CRITICAL PERF: Exclude imageUrl from list — it's base64 and balloons the payload 10x.
+        // The individual /reports/:id endpoint serves the full image for the dossier view.
         const reports = await Report.find(query)
             .sort({ createdAt: -1 })
-            .limit(100)
+            .limit(50)
+            .select('-imageUrl -resolutionImageUrl -detectedObjects -aiAnalysis')
             .lean();
         
         const now = new Date();
         const sanitizedReports = reports.map(r => ({
             ...r,
             isEscalated: r.status !== 'Resolved' && r.deadline && new Date(r.deadline) < now,
-            imageUrl: (r.imageUrl && r.imageUrl.includes('example.com')) ? null : r.imageUrl
         }));
         
-        // Cache authority dashboard for 30 seconds to block infinite polling lag
         setCache(cacheKey, sanitizedReports, 30000);
         res.set('Cache-Control', 'private, max-age=30');
         res.json(sanitizedReports);

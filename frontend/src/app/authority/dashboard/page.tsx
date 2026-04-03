@@ -421,9 +421,15 @@ export default function AuthorityDashboard() {
                                         key={report._id}
                                         className="bg-white rounded-[2rem] overflow-hidden shadow-[0_10px_40px_-15px_rgba(0,0,0,0.08)] border border-slate-100/80 flex flex-col group transition-all"
                                     >
-                                        <div className="w-full h-56 xl:h-64 shrink-0 relative overflow-hidden bg-slate-100 block">
-                                            <img src={report.imageUrl} alt="Issue" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                                            <Link href={`/authority/reports/${report._id}`} className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-indigo-600 shadow-xl hover:bg-white border border-white/20 transition-all flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0">
+                                        <div className="w-full h-40 shrink-0 relative overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 block">
+                                            {/* Image stripped from list for performance — loads in Dossier view */}
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400">
+                                                <FileText size={32} strokeWidth={1.5} />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">{report.category}</span>
+                                            </div>
+                                            {/* Severity color bar at top */}
+                                            <div className={`absolute top-0 left-0 right-0 h-1 ${report.severity === 'High' || report.isEscalated ? 'bg-red-500' : report.severity === 'Medium' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                                            <Link href={`/authority/reports/${report._id}`} className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-indigo-600 shadow-xl hover:bg-white border border-white/20 transition-all flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0">
                                                 Open Dossier <ArrowRight size={12} />
                                             </Link>
                                         </div>
