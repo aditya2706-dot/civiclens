@@ -8,8 +8,8 @@ import FilterBar from "@/components/FilterBar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const CACHE_KEY = "civiclens_reports_cache";
-const CACHE_TTL = 60 * 1000; // 60 seconds
+const CACHE_KEY = "civiclens_my_reports_v2";
+const CACHE_TTL = 30 * 1000; // 30 seconds — matches backend cache
 
 function FloatingLoader() {
     return (
@@ -39,47 +39,46 @@ export default function MyReports() {
     const router = useRouter();
 
     useEffect(() => {
-        // 1. Show cached data instantly
-        try {
-            const cached = localStorage.getItem(CACHE_KEY);
-            if (cached) {
-                const { data, ts } = JSON.parse(cached);
-                if (Date.now() - ts < CACHE_TTL && Array.isArray(data)) {
-                    setReports(data);
-                    setLoading(false);
-                }
-            }
-        } catch (_) {}
-
-        // 2. Always fetch fresh in background
         const fetchReports = async () => {
             try {
                 const token = localStorage.getItem("token");
-                if (!token) {
-                    router.push("/login");
-                    return;
-                }
+                if (!token) { router.push("/login"); return; }
+
+                // 1. Show cached data instantly (zero loading state)
+                try {
+                    const cached = localStorage.getItem(CACHE_KEY);
+                    if (cached) {
+                        const { data, ts } = JSON.parse(cached);
+                        if (Date.now() - ts < CACHE_TTL && Array.isArray(data)) {
+                            setReports(data);
+                            setLoading(false);
+                        }
+                    }
+                } catch (_) {}
+
+                // 2. Always fetch fresh in background
                 const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/my`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+
                 if (Array.isArray(res.data)) {
                     setReports(res.data);
                     setLoading(false);
                     try {
-                        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: res.data, ts: Date.now() }));
+                        // Strip base64 image data before caching to avoid localStorage quota error
+                        const cacheData = res.data.map((r: any) => ({ ...r, imageUrl: r.imageUrl?.startsWith('data:') ? null : r.imageUrl }));
+                        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: cacheData, ts: Date.now() }));
                     } catch (_) {}
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Failed to fetch personal reports:", err);
                 setLoading(false);
-                router.push("/login");
+                if (err?.response?.status === 401) router.push("/login");
             }
         };
-        fetchReports();
 
-        // 3. Auto-refresh every 15 seconds
-        const interval = setInterval(fetchReports, 15000);
-        return () => clearInterval(interval);
+        fetchReports();
+        // No polling — single fetch on mount is sufficient for a static list view
     }, []);
 
     const getStatusColor = (status: string) => {

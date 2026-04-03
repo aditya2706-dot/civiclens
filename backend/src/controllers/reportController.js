@@ -190,8 +190,17 @@ const getReports = async (req, res) => {
 // @access  Private
 const getMyReports = async (req, res) => {
     try {
+        const cacheKey = `my_reports_${req.user._id}`;
+        const cached = getCache(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'private, max-age=30');
+            return res.json(cached);
+        }
+
+        // Select only fields needed for the list view — skip heavy full imageUrl data
         const reports = await Report.find({ userId: req.user._id })
             .sort({ createdAt: -1 })
+            .select('category status description aiSummary location ward createdAt imageUrl severity duplicateCount isEscalated deadline')
             .lean();
             
         const now = new Date();
@@ -201,6 +210,8 @@ const getMyReports = async (req, res) => {
             imageUrl: (r.imageUrl && r.imageUrl.includes('example.com')) ? null : r.imageUrl
         }));
         
+        setCache(cacheKey, sanitizedReports, 30000); // cache per-user for 30s
+        res.set('Cache-Control', 'private, max-age=30');
         res.json(sanitizedReports);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching your reports', error: error.message });
