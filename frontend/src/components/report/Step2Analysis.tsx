@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Check, Edit2, AlertTriangle, Box, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { compressImage, blobToBase64 } from "@/utils/imageUtils";
+import { compressForAI, compressForStorage, blobToBase64, blobToDataUrl } from "@/utils/imageUtils";
 
 export function Step2Analysis({
     onNext,
@@ -41,43 +41,38 @@ export function Step2Analysis({
                 let fileBlob = data.file;
 
                 // If the user uploaded a photo but the File object didn't survive state transition,
-                // fetch it back from the blob URL.
+                // fetch it back from the blob URL or data URL.
                 if (!fileBlob && data.imageUrl.startsWith("blob:")) {
                     const response = await fetch(data.imageUrl);
                     fileBlob = await response.blob();
                 }
 
-                let base64DataOnly: string;
-                let mimeType: string;
-                let finalPreviewUrl: string;
-
                 if (!fileBlob && data.imageUrl.startsWith("data:image")) {
-                    // If it's already a base64 string (camera capture usually), we still compress it
-                    // Convert dataURL to blob first
                     const response = await fetch(data.imageUrl);
-                    const blob = await response.blob();
-                    
-                    console.log(`Original size: ${(blob.size / 1024).toFixed(2)} KB`);
-                    const compressedBlob = await compressImage(blob);
-                    console.log(`Compressed size: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
-                    
-                    base64DataOnly = await blobToBase64(compressedBlob);
-                    mimeType = 'image/jpeg';
-                    finalPreviewUrl = data.imageUrl; // Keep high-res for preview if desired, or use compressed
-                } else if (fileBlob) {
-                    // Regular file/blob from capture or upload
-                    console.log(`Original size: ${(fileBlob.size / 1024).toFixed(2)} KB`);
-                    const compressedBlob = await compressImage(fileBlob);
-                    console.log(`Compressed size: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
-                    
-                    base64DataOnly = await blobToBase64(compressedBlob);
-                    mimeType = 'image/jpeg';
-                    
-                    // Generate a new preview URL for the compressed image to use in later steps
-                    finalPreviewUrl = URL.createObjectURL(compressedBlob);
-                } else {
-                    throw new Error("No image data found to analyze");
+                    fileBlob = await response.blob();
                 }
+
+                if (!fileBlob) throw new Error("No image data found to analyze");
+
+                const originalKB = (fileBlob.size / 1024).toFixed(0);
+
+                // Two separate compressions:
+                // 1. For Gemini AI — 800px, 65% quality (~50-80 KB) — enough detail for vision AI
+                // 2. For storage/display — 600px, 55% quality (~25-45 KB) — lightweight thumbnail
+                const [aiBlob, storageBlob] = await Promise.all([
+                    compressForAI(fileBlob),
+                    compressForStorage(fileBlob)
+                ]);
+
+                console.log(`🗜️ Compressed: ${originalKB}KB → AI: ${(aiBlob.size/1024).toFixed(0)}KB | Storage: ${(storageBlob.size/1024).toFixed(0)}KB`);
+
+                const [base64DataOnly, storageDataUrl] = await Promise.all([
+                    blobToBase64(aiBlob),
+                    blobToDataUrl(storageBlob)
+                ]);
+
+                const mimeType = 'image/jpeg';
+                const finalPreviewUrl = URL.createObjectURL(storageBlob);
 
                 const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports/analyze`, {
                     imageBase64: base64DataOnly,
@@ -93,15 +88,18 @@ export function Step2Analysis({
 
                 updateData({
                     ...data,
-                    imageUrl: finalPreviewUrl, // Swap with optimized URL
-                    base64Image: `data:${mimeType};base64,${base64DataOnly}`,
+                    imageUrl: finalPreviewUrl,
+                    // Store the storage-compressed data URL (not AI blob) to avoid sending big data to DB
+                    base64Image: storageDataUrl,
                     aiAnalysis: {
                         summary: response.data.summary,
                         detectedObjects: response.data.detectedObjects,
                         suggestedCategory: response.data.suggestedCategory,
                         computedSeverity: response.data.estimatedSeverity,
                         department: response.data.department,
-                        suggestedWard: response.data.suggestedWard
+                        suggestedWard: response.data.suggestedWard,
+                        estimatedCost: response.data.estimatedCost,
+                        estimatedResources: response.data.estimatedResources,
                     }
                 });
                 setAnalyzing(false);
