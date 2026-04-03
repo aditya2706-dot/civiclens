@@ -6,7 +6,18 @@ import "./globals.css";
 import OfflineSync from "@/components/OfflineSync";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
+import { useEffect } from "react";
+
 const outfit = Outfit({ subsets: ["latin"], weight: ["300", "400", "500", "700", "900"] });
+
+// Silently wake up the backend server on app load (prevents cold-start timeout on Render.com free tier)
+function BackendKeepalive() {
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '')}/`, { method: 'GET' })
+      .catch(() => {}); // Silent — we don't care about the response
+  }, []);
+  return null;
+}
 
 export default function RootLayout({
   children,
@@ -27,12 +38,14 @@ export default function RootLayout({
         {cleanClientId ? (
           <GoogleOAuthProvider clientId={cleanClientId}>        
             <LanguageProvider>
+              <BackendKeepalive />
               <OfflineSync />
               {children}
             </LanguageProvider>
           </GoogleOAuthProvider>
         ) : (
           <LanguageProvider>
+            <BackendKeepalive />
             <OfflineSync />
             {children}
           </LanguageProvider>

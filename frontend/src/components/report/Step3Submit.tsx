@@ -58,15 +58,25 @@ export function Step3Submit({
                 return;
             }
 
-            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports`, payload, { headers });
+            // 90-second timeout to handle cold server startups on free hosting (Render.com spins down after inactivity)
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/reports`, payload, {
+                headers,
+                timeout: 90000
+            });
 
             if (res.data) {
                 setOtp(res.data.resolutionOTP || null);
                 setSubmitted(true);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error submitting report:", error);
-            alert("Failed to submit report. Please try again.");
+            if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                alert("The server is waking up from sleep. Please wait 30 seconds and try again.");
+            } else if (!navigator.onLine) {
+                alert("You appear to be offline. Your report will be saved and submitted when you reconnect.");
+            } else {
+                alert("Failed to submit report. Please try again.");
+            }
         } finally {
             setIsSubmitting(false);
         }
