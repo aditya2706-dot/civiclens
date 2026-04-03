@@ -42,12 +42,12 @@ export default function AuthorityDashboard() {
         const fetchDashboardData = async () => {
             const token = localStorage.getItem("token");
             if (!token) {
-                router.push("/login");
+                router.push("/authority/login");
                 return;
             }
 
             try {
-                // Check cache for instant load
+                // Check cache for instant paint — show immediately while fresh data loads behind the scenes
                 const cachedDocs = sessionStorage.getItem("authority_reports");
                 const cachedUser = sessionStorage.getItem("authority_user");
                 if (cachedDocs && cachedUser) {
@@ -56,41 +56,38 @@ export default function AuthorityDashboard() {
                     setLoading(false);
                 }
 
-                // Verify Profile
-                const profileRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                // Run profile + reports in PARALLEL for maximum speed (was sequential before)
+                const [profileRes, reportsRes] = await Promise.all([
+                    axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }),
+                    axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/authority`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    })
+                ]);
 
                 if (profileRes.data.role !== "authority" && profileRes.data.role !== "admin") {
-                    router.push("/settings");
+                    router.push("/authority/login");
                     return;
                 }
 
                 setUser(profileRes.data);
-
-                // Fetch Assigned Reports
-                const reportsRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/authority`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
                 setReports(reportsRes.data);
+
                 try {
-                    // Only cache the top 15 reports to prevent sessionStorage QuotaExceededError from massive base64 image strings
                     sessionStorage.setItem("authority_reports", JSON.stringify(reportsRes.data.slice(0, 15)));
                     sessionStorage.setItem("authority_user", JSON.stringify(profileRes.data));
                 } catch (e) {
                     console.warn("SessionStorage quota exceeded, skipping local caching.", e);
                 }
 
-                // Fetch Staff list for assignment dropdown
+                // Fetch Staff list only for admin/supervisor (non-blocking, runs after above)
                 if (profileRes.data.role === 'admin' || profileRes.data.role === 'supervisor') {
-                    try {
-                        const staffRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/staff`, {
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
+                    axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/staff`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }).then(staffRes => {
                         setStaffList(staffRes.data.registered || []);
-                    } catch(e) {
-                         console.error("Staff fetch failed", e);
-                    }
+                    }).catch(e => console.error("Staff fetch failed", e));
                 }
 
             } catch (error: any) {
