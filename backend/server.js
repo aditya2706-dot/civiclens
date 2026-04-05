@@ -31,6 +31,8 @@ app.use('/api/reports', require('./src/routes/reportRoutes'));
 app.use('/api/blogs', require('./src/routes/blogRoutes'));
 app.use('/api/notifications', require('./src/routes/notificationRoutes'));
 app.use('/api/broadcasts', require('./src/routes/broadcastRoutes'));
+app.use('/api/whatsapp', require('./src/routes/whatsappRoutes'));
+app.use('/api/national', require('./src/routes/nationalPortalRoutes'));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI)
