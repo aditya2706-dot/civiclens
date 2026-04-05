@@ -1,6 +1,21 @@
-import { Camera, MapPin, Upload, Loader2, CheckCircle2, AlertTriangle, Info } from "lucide-react";
-import { motion } from "framer-motion";
+import { Camera, MapPin, Upload, Loader2, CheckCircle2, AlertTriangle, Info, Search, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
+
+// Build a flat searchable index from the ward data
+type WardData = Record<string, string[]>;
+type LandmarkResult = { landmark: string; ward: string; wardNum: number };
+
+function buildSearchIndex(wardData: WardData): LandmarkResult[] {
+    const index: LandmarkResult[] = [];
+    for (const [ward, landmarks] of Object.entries(wardData)) {
+        const wardNum = parseInt(ward.replace("Ward ", ""));
+        for (const landmark of landmarks) {
+            index.push({ landmark, ward, wardNum });
+        }
+    }
+    return index;
+}
 
 export function Step1Capture({
     onNext,
@@ -16,18 +31,76 @@ export function Step1Capture({
     const [showHint, setShowHint] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Landmark search state
+    const [wardData, setWardData] = useState<WardData>({});
+    const [searchIndex, setSearchIndex] = useState<LandmarkResult[]>([]);
+    const [landmarkQuery, setLandmarkQuery] = useState(data.nearbyLandmark || "");
+    const [suggestions, setSuggestions] = useState<LandmarkResult[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedLandmark, setSelectedLandmark] = useState<LandmarkResult | null>(
+        data.nearbyLandmark ? { landmark: data.nearbyLandmark, ward: data.ward || "", wardNum: 0 } : null
+    );
+    const searchRef = useRef<HTMLDivElement>(null);
+
+    // Load ward data on mount
     useEffect(() => {
-        // Automatically ask for location as soon as the component mounts
+        fetch("/alwar_wards.json")
+            .then(r => r.json())
+            .then((json: WardData) => {
+                setWardData(json);
+                setSearchIndex(buildSearchIndex(json));
+            })
+            .catch(() => console.warn("Ward data not available"));
+    }, []);
+
+    // Handle landmark search
+    useEffect(() => {
+        if (!landmarkQuery.trim() || landmarkQuery.length < 2) {
+            setSuggestions([]);
+            return;
+        }
+        const q = landmarkQuery.toLowerCase();
+        const results = searchIndex
+            .filter(item => item.landmark.toLowerCase().includes(q))
+            .slice(0, 6);
+        setSuggestions(results);
+        setShowSuggestions(results.length > 0);
+    }, [landmarkQuery, searchIndex]);
+
+    // Close suggestions when clicking outside
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const handleLandmarkSelect = (result: LandmarkResult) => {
+        setSelectedLandmark(result);
+        setLandmarkQuery(result.landmark);
+        setShowSuggestions(false);
+        updateData({
+            ...data,
+            nearbyLandmark: result.landmark,
+            ward: result.ward,
+        });
+    };
+
+    const clearLandmark = () => {
+        setSelectedLandmark(null);
+        setLandmarkQuery("");
+        updateData({ ...data, nearbyLandmark: "", ward: data.ward });
+    };
+
+    useEffect(() => {
         if (!data.location) {
             fetchLocation();
-            
-            // Show a helpful hint if location isn't acquired within 5 seconds
             const timer = setTimeout(() => {
-                if (!data.location) {
-                    setShowHint(true);
-                }
+                if (!data.location) setShowHint(true);
             }, 5000);
-            
             return () => clearTimeout(timer);
         }
     }, [data.location]);
@@ -35,22 +108,11 @@ export function Step1Capture({
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
-        // In a real app, you would upload this file to S3/Cloudinary here.
-        // For now, we create a local object URL to display the preview.
         const imageUrl = URL.createObjectURL(file);
-
-        updateData({
-            ...data,
-            imageUrl: imageUrl,
-            file: file // Store actual file for submission later if needed
-        });
-
-        // Automatically fetch location when image is selected if we don't have it
+        updateData({ ...data, imageUrl, file });
         if (!data.location) {
             fetchLocation(imageUrl);
         } else {
-            // If we have location already, wait a sec then go next
             setTimeout(onNext, 800);
         }
     };
@@ -58,58 +120,40 @@ export function Step1Capture({
     const fetchLocation = (capturedImageUrl?: string) => {
         setIsLocating(true);
         setLocationError("");
-
         if (!navigator.geolocation) {
             setLocationError("Geolocation is not supported by your browser");
             setIsLocating(false);
             return;
         }
-
         const urlToUse = capturedImageUrl || data.imageUrl;
-
         const options = { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 };
-
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 setIsLocating(false);
                 updateData({
                     ...data,
                     imageUrl: urlToUse,
-                    location: {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    }
+                    location: { lat: position.coords.latitude, lng: position.coords.longitude }
                 });
                 if (capturedImageUrl) setTimeout(onNext, 1000);
             },
-            (error) => {
-                // If Timeout (3) or other failure, try low accuracy immediately
-                if (options.enableHighAccuracy) {
-                    console.warn("Retrying with low accuracy for speed...");
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                            setIsLocating(false);
-                            updateData({
-                                ...data,
-                                imageUrl: urlToUse,
-                                location: {
-                                    lat: pos.coords.latitude,
-                                    lng: pos.coords.longitude
-                                }
-                            });
-                            if (capturedImageUrl) setTimeout(onNext, 1000);
-                        },
-                        (err) => {
-                            setIsLocating(false);
-                            setLocationError("Could not detect location. Please ensure GPS is active and you are in an open area.");
-                            console.error("Location error (fallback):", err);
-                        },
-                        { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 } // 5 min cache
-                    );
-                    return;
-                }
-                setIsLocating(false);
-                setLocationError("Location access denied or failed. Please enable GPS.");
+            () => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        setIsLocating(false);
+                        updateData({
+                            ...data,
+                            imageUrl: urlToUse,
+                            location: { lat: pos.coords.latitude, lng: pos.coords.longitude }
+                        });
+                        if (capturedImageUrl) setTimeout(onNext, 1000);
+                    },
+                    () => {
+                        setIsLocating(false);
+                        setLocationError("Could not detect location. Please ensure GPS is active.");
+                    },
+                    { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+                );
             },
             options
         );
@@ -120,30 +164,27 @@ export function Step1Capture({
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className="space-y-6"
+            className="space-y-4"
         >
             <input
                 type="file"
                 accept="image/*"
-                capture="environment" // Hints mobile browsers to use rear camera
+                capture="environment"
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleFileChange}
             />
 
+            {/* Photo Capture Area */}
             <div
-                className={`rounded-3xl p-8 border-2 border-dashed flex flex-col items-center justify-center min-h-[300px] cursor-pointer transition-colors relative overflow-hidden
+                className={`rounded-3xl p-8 border-2 border-dashed flex flex-col items-center justify-center min-h-[260px] cursor-pointer transition-colors relative overflow-hidden
                     ${data.imageUrl ? 'border-green-500 bg-black' : 'border-green-200 bg-green-50 hover:bg-green-100'}
                 `}
                 onClick={() => !data.imageUrl && fileInputRef.current?.click()}
             >
                 {data.imageUrl ? (
                     <>
-                        <img
-                            src={data.imageUrl}
-                            alt="Captured evidence"
-                            className="absolute inset-0 w-full h-full object-cover opacity-80"
-                        />
+                        <img src={data.imageUrl} alt="Captured evidence" className="absolute inset-0 w-full h-full object-cover opacity-80" />
                         <button
                             onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                             className="absolute bottom-4 bg-white/90 backdrop-blur text-gray-800 px-4 py-2 rounded-full font-semibold text-sm shadow-lg border border-gray-100 flex items-center gap-2"
@@ -162,6 +203,79 @@ export function Step1Capture({
                 )}
             </div>
 
+            {/* 🗺️ Landmark/Ward Search */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" ref={searchRef}>
+                <div className="px-4 pt-3 pb-1">
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Nearby Landmark (Optional)</p>
+                </div>
+                <div className="relative px-4 pb-3">
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100 focus-within:border-green-400 transition-colors">
+                        <Search size={16} className="text-gray-400 flex-shrink-0" />
+                        <input
+                            type="text"
+                            value={landmarkQuery}
+                            onChange={e => {
+                                setLandmarkQuery(e.target.value);
+                                setSelectedLandmark(null);
+                            }}
+                            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                            placeholder="e.g. Sarafa Bazar, Hope Circus..."
+                            className="flex-1 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400"
+                        />
+                        {landmarkQuery && (
+                            <button onClick={clearLandmark} className="text-gray-400 hover:text-gray-600">
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Selected Ward Badge */}
+                    <AnimatePresence>
+                        {selectedLandmark && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                className="mt-2 flex items-center gap-2"
+                            >
+                                <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+                                    <MapPin size={11} />
+                                    {selectedLandmark.ward} detected
+                                </span>
+                                <span className="text-xs text-gray-400">Report will be routed correctly</span>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Dropdown Suggestions */}
+                    <AnimatePresence>
+                        {showSuggestions && suggestions.length > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                                className="absolute left-4 right-4 top-full z-50 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden"
+                            >
+                                {suggestions.map((s, i) => (
+                                    <button
+                                        key={i}
+                                        onMouseDown={() => handleLandmarkSelect(s)}
+                                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-green-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                                    >
+                                        <div className="flex items-center gap-2.5">
+                                            <MapPin size={14} className="text-green-500 flex-shrink-0" />
+                                            <span className="text-sm text-gray-700 font-medium">{s.landmark}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{s.ward}</span>
+                                    </button>
+                                ))}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {/* GPS Location Card */}
             <div className={`bg-white rounded-2xl p-4 shadow-sm border flex flex-col gap-2 ${locationError ? 'border-red-200' : 'border-gray-100'}`}>
                 <div className="flex items-center gap-4">
                     <div className={`p-3 rounded-xl flex-shrink-0 ${data.location ? 'bg-green-100 text-green-600' : (locationError ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500')}`}>
@@ -170,7 +284,7 @@ export function Step1Capture({
                     <div className="flex-1">
                         {data.location ? (
                             <>
-                                <h4 className="font-semibold text-gray-800 text-sm">Location Acquired</h4>
+                                <h4 className="font-semibold text-gray-800 text-sm">GPS Location Acquired</h4>
                                 <p className="text-xs text-gray-500">{data.location.lat.toFixed(5)}, {data.location.lng.toFixed(5)}</p>
                             </>
                         ) : (
@@ -179,13 +293,13 @@ export function Step1Capture({
                                     {isLocating ? 'Detecting location...' : (locationError ? 'Location Error' : 'Location Required')}
                                 </h4>
                                 <p className="text-xs text-gray-400">
-                                    {isLocating ? 'Please wait...' : (locationError ? 'GPS access is mandatory' : 'Will be auto-detected upon capture')}
+                                    {isLocating ? 'Please wait...' : (locationError ? 'GPS access is mandatory' : 'Auto-detected on capture')}
                                 </p>
                             </>
                         )}
                     </div>
                     {locationError && !isLocating && (
-                        <button 
+                        <button
                             onClick={(e) => { e.stopPropagation(); fetchLocation(); }}
                             className="bg-red-500 text-white text-[10px] font-bold px-3 py-2 rounded-lg hover:bg-red-600 transition-colors"
                         >
@@ -199,7 +313,7 @@ export function Step1Capture({
             </div>
 
             {showHint && !data.location && (
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3"
@@ -210,13 +324,12 @@ export function Step1Capture({
                     <div>
                         <h4 className="text-sm font-bold text-blue-800">Need Location Permission?</h4>
                         <p className="text-xs text-blue-600 leading-normal mt-0.5">
-                            Please ensure your phone's GPS is ON and you've clicked **"Allow"** on the browser's location prompt. This is required for valid reporting.
+                            Please ensure your phone's GPS is ON and you've clicked "Allow" on the browser's location prompt.
                         </p>
                     </div>
                 </motion.div>
             )}
 
-            {/* Manual override / next step if location failed but they want to proceed (optional, depends on strictness) */}
             {(data.imageUrl && !isLocating) && (
                 <button
                     onClick={onNext}

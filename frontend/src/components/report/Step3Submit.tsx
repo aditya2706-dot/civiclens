@@ -45,7 +45,8 @@ export function Step3Submit({
                 detectedObjects: data.aiAnalysis?.detectedObjects || [],
                 severity: data.aiAnalysis?.computedSeverity || 'Medium',
                 location: manualAddress ? { address: manualAddress } : (data.location || { lat: 0, lng: 0 }),
-                ward: selectedWard,
+                ward: data.ward || selectedWard,
+                nearbyLandmark: data.nearbyLandmark || '',
                 isAnonymous: isAnonymous
             };
 

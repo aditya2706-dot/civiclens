@@ -52,6 +52,10 @@ const reportSchema = new mongoose.Schema({
         lng: { type: Number },
         address: { type: String }
     },
+    nearbyLandmark: {
+        type: String,
+        default: ''
+    },
     status: {
         type: String,
         enum: ['Pending', 'Under Review', 'In Progress', 'Resolved', 'Under Audit'],
