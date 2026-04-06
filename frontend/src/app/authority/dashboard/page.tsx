@@ -11,6 +11,7 @@ import PremiumLoader from "@/components/PremiumLoader";
 import StaffManagement from "@/components/StaffManagement";
 import DataIntelligence from "@/components/authority/DataIntelligence";
 import KanbanBoard from "@/components/authority/KanbanBoard";
+import PushNotificationToggle from "@/components/authority/PushNotificationToggle";
 import { Users } from "lucide-react";
 
 export default function AuthorityDashboard() {
@@ -309,6 +310,7 @@ export default function AuthorityDashboard() {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
+                        <PushNotificationToggle />
                         <motion.button 
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}

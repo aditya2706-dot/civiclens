@@ -89,24 +89,49 @@ function getHighSeverityAlertHTML(report) {
 // ─── Exported Functions ───────────────────────────────────────────────────────
 
 /**
- * Send High Severity alert email to authority officers
+ * Send High Severity alert email to the ward/department officers
+ * Looks up officers from DB by ward+department — NOT a single hardcoded email
  */
 async function sendHighSeverityAlert(report) {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.warn('[Email] Credentials not configured. Alert not sent.');
+        // Email not configured — push notifications will handle this instead
         return;
     }
 
-    const to = process.env.AUTHORITY_EMAIL || process.env.EMAIL_USER;
-
     try {
+        // Find officers responsible for this ward or department
+        const User = require('../models/User');
+        let officers = await User.find({
+            role: { $in: ['authority', 'supervisor', 'admin'] },
+            email: { $exists: true, $ne: null, $ne: '' },
+            $or: [
+                { ward: report.ward },
+                { department: report.department },
+            ]
+        }).select('email name ward');
+
+        // Fallback: notify all admins if no specific ward officer found
+        if (officers.length === 0) {
+            officers = await User.find({
+                role: { $in: ['admin', 'supervisor'] },
+                email: { $exists: true, $ne: null, $ne: '' }
+            }).select('email name');
+        }
+
+        if (officers.length === 0) {
+            console.warn('[Email] No officers with email found for ward:', report.ward);
+            return;
+        }
+
+        const toEmails = [...new Set(officers.map(o => o.email))];
+
         await transporter.sendMail({
             from: `"CivicLens Alert System" <${process.env.EMAIL_USER}>`,
-            to,
-            subject: `🚨 HIGH SEVERITY: ${report.category} reported in ${report.ward || 'Alwar'} — Immediate Action Required`,
+            to: toEmails.join(', '),
+            subject: `🚨 HIGH SEVERITY: ${report.category} in ${report.ward || 'Alwar'} — Immediate Action Required`,
             html: getHighSeverityAlertHTML(report),
         });
-        console.log(`[Email] High severity alert sent to ${to}`);
+        console.log(`[Email] High severity alert sent to ${toEmails.length} officer(s): ${toEmails.join(', ')}`);
     } catch (err) {
         console.error('[Email] Failed to send alert:', err.message);
     }

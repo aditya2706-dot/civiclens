@@ -2,7 +2,8 @@ const Report = require('../models/Report');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { analyzeImageGemini, getDepartmentForCategory, translateText } = require('../services/aiService');
-const { sendHighSeverityAlert, sendResolutionEmail } = require('../services/emailService');
+const { sendHighSeverityPush, sendNewReportPush } = require('../services/pushService');
+const { sendHighSeverityAlert } = require('../services/emailService');
 const axios = require('axios');
 const { getWardFromCoordinates } = require('../utils/wardDetector');
 
@@ -124,9 +125,10 @@ const submitReport = async (req, res) => {
         // Invalidate cache so the new report appears immediately
         clearCache();
 
-        // 📧 Email alert for High Severity (fire-and-forget, non-blocking)
+        // 🔔 Push + 📧 Email alerts for High Severity (fire-and-forget, non-blocking)
         if (severity === 'High') {
-            sendHighSeverityAlert(report).catch(() => {});
+            sendHighSeverityPush(report).catch(() => {});   // Instant mobile push to ward officer
+            sendHighSeverityAlert(report).catch(() => {});  // Email backup (if configured)
         }
 
         // Feature: Push Notifications for High Severity (Ward/Department Scope)
