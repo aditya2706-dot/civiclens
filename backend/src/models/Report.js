@@ -74,6 +74,10 @@ const reportSchema = new mongoose.Schema({
     deadline: {
         type: Date,
     },
+    resolvedAt: {
+        type: Date,
+        default: null,
+    },
     isEscalated: {
         type: Boolean,
         default: false,

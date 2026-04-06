@@ -22,6 +22,10 @@ const {
     assignReport
 } = require('../controllers/reportController');
 const { protect, optionalAuth, admin, authority, adminOrAuthority } = require('../middlewares/authMiddleware');
+const { generateMonthlyPDF } = require('../controllers/pdfController');
+
+// PDF Report Export — Authority/Admin only
+router.route('/monthly-pdf').get(protect, adminOrAuthority, generateMonthlyPDF);
 
 // Authority route to get their assigned reports
 router.route('/authority').get(protect, adminOrAuthority, getAuthorityReports);

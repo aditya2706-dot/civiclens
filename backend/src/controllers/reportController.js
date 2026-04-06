@@ -372,6 +372,9 @@ const updateReportStatus = async (req, res) => {
             }
 
             report.status = status;
+            if (status === 'Resolved' && !report.resolvedAt) {
+                report.resolvedAt = new Date();
+            }
             if (resolutionImageUrl) {
                 report.resolutionImageUrl = resolutionImageUrl;
             }
@@ -598,20 +601,47 @@ async function getMapReports(req, res) {
     }
 }
 
-// @desc    Get global statistics (unresolved count)
+// @desc    Get global statistics for public transparency portal
 // @route   GET /api/reports/stats
 // @access  Public
 const getReportsStats = async (req, res) => {
     try {
-        const cacheKey = 'global_stats';
+        const cacheKey = 'global_stats_v2';
         const cached = getCache(cacheKey);
         if (cached) return res.json(cached);
 
-        const unresolvedCount = await Report.countDocuments({ 
-            status: { $in: ['Pending', 'Under Review', 'In Progress'] } 
-        });
+        const [all, categoryAgg, statusAgg, wardAgg, severityAgg] = await Promise.all([
+            Report.countDocuments(),
+            Report.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }]),
+            Report.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+            Report.aggregate([
+                { $match: { ward: { $ne: null, $ne: '' } } },
+                { $group: { _id: '$ward', count: { $sum: 1 } } },
+                { $sort: { count: -1 } }, { $limit: 15 }
+            ]),
+            Report.aggregate([{ $group: { _id: '$severity', count: { $sum: 1 } } }]),
+        ]);
 
-        const data = { unresolvedCount };
+        const categoryCounts = Object.fromEntries(categoryAgg.map(a => [a._id, a.count]));
+        const statusCounts   = Object.fromEntries(statusAgg.map(a => [a._id, a.count]));
+        const wardCounts     = Object.fromEntries(wardAgg.map(a => [a._id, a.count]));
+        const severityCounts = Object.fromEntries(severityAgg.map(a => [a._id, a.count]));
+
+        const resolved = statusCounts['Resolved'] || 0;
+        const unresolved = all - resolved;
+
+        const data = {
+            totalReports: all,
+            resolvedReports: resolved,
+            unresolvedCount: unresolved,
+            pendingReports: statusCounts['Pending'] || 0,
+            categoryCounts,
+            statusCounts,
+            wardCounts,
+            severityCounts,
+            resolutionRate: all > 0 ? Math.round((resolved / all) * 100) : 0,
+        };
+
         setCache(cacheKey, data, 30000); // 30s cache
         res.json(data);
     } catch (error) {
