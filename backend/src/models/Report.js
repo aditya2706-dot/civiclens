@@ -118,6 +118,16 @@ const reportSchema = new mongoose.Schema({
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         text: { type: String, required: true },
         createdAt: { type: Date, default: Date.now }
+    }],
+    // RTI-compliant audit trail — tamper-proof log of every action
+    activityLog: [{
+        action: { type: String, required: true },      // e.g. "STATUS_CHANGED", "ASSIGNED", "NOTE_ADDED"
+        actor: { type: String },                        // Official name or "System"
+        actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        from: { type: String },                         // Previous value
+        to: { type: String },                           // New value
+        note: { type: String },                         // Optional context
+        timestamp: { type: Date, default: Date.now }
     }]
 }, { timestamps: true });
 

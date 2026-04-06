@@ -38,6 +38,15 @@ export default function AuthorityDashboard() {
     const [staffList, setStaffList] = useState<any[]>([]);
     const [internalNoteInputs, setInternalNoteInputs] = useState<{[key: string]: string}>({});
 
+    // SLA Breach State
+    const [slaSummary, setSlaSummary] = useState<{overdue: number; dueSoon: number; escalated: number} | null>(null);
+
+    // Bulk Actions State
+    const [selectedReports, setSelectedReports] = useState<Set<string>>(new Set());
+    const [bulkStatus, setBulkStatus] = useState<string>('');
+    const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+    const [bulkMode, setBulkMode] = useState(false);
+
     useEffect(() => {
         const fetchDashboardData = async () => {
             const token = localStorage.getItem("token");
@@ -104,6 +113,19 @@ export default function AuthorityDashboard() {
         };
 
         fetchDashboardData();
+
+        // Fetch SLA breach summary (non-blocking)
+        const fetchSLA = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            try {
+                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/reports/sla-summary`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setSlaSummary(res.data);
+            } catch (e) { /* Silently fail if not supported */ }
+        };
+        fetchSLA();
     }, [router]);
 
     const handleStatusUpdate = async (id: string, newStatus: string, resolutionFile?: File | null, otp?: string) => {
@@ -226,6 +248,35 @@ export default function AuthorityDashboard() {
         document.body.removeChild(link);
     };
 
+    const handleBulkUpdate = async () => {
+        if (!bulkStatus || selectedReports.size === 0) return;
+        if (!confirm(`Update ${selectedReports.size} reports to "${bulkStatus}"?`)) return;
+        setIsBulkUpdating(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/reports/bulk-status`, {
+                reportIds: Array.from(selectedReports),
+                status: bulkStatus
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            setReports(reports.map(r => selectedReports.has(r._id) ? { ...r, status: bulkStatus } : r));
+            setSelectedReports(new Set());
+            setBulkMode(false);
+            setBulkStatus('');
+        } catch (err) {
+            alert('Bulk update failed. Please try again.');
+        } finally {
+            setIsBulkUpdating(false);
+        }
+    };
+
+    const toggleSelectReport = (id: string) => {
+        setSelectedReports(prev => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
     if (loading) {
         return <PremiumLoader message="Verifying Official Identity..." />;
     }
@@ -294,6 +345,76 @@ export default function AuthorityDashboard() {
                 </div>
                 </div>
             </header>
+
+            {/* 🚨 SLA BREACH BANNER — appears when overdue reports exist */}
+            {slaSummary && slaSummary.overdue > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: -16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-7xl mx-auto px-4 md:px-8 mb-4 relative z-20"
+                >
+                    <div className="bg-red-950/80 border border-red-500/40 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-lg shadow-red-900/20">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <AlertTriangle size={18} className="text-red-400 animate-pulse" />
+                            </div>
+                            <div>
+                                <p className="text-red-300 font-black text-sm">
+                                    ⚠️ {slaSummary.overdue} Report{slaSummary.overdue > 1 ? 's' : ''} OVERDUE — SLA Breach
+                                </p>
+                                <p className="text-red-400/60 text-xs">
+                                    {slaSummary.dueSoon > 0 ? `${slaSummary.dueSoon} more due within 6 hours.` : 'Immediate action required.'}
+                                    {slaSummary.escalated > 0 ? ` · ${slaSummary.escalated} escalated.` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setBulkMode(true)}
+                            className="flex-shrink-0 bg-red-500 hover:bg-red-400 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors"
+                        >
+                            Select & Fix
+                        </button>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* ✅ BULK ACTION TOOLBAR */}
+            {bulkMode && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-7xl mx-auto px-4 md:px-8 mb-4 relative z-20"
+                >
+                    <div className="bg-blue-950/80 border border-blue-500/30 rounded-2xl p-3 flex flex-wrap items-center gap-3">
+                        <span className="text-blue-300 text-xs font-bold">
+                            {selectedReports.size > 0 ? `${selectedReports.size} selected` : 'Select reports below'}
+                        </span>
+                        <select
+                            value={bulkStatus}
+                            onChange={e => setBulkStatus(e.target.value)}
+                            className="bg-slate-800 border border-slate-600 text-white text-xs rounded-xl px-3 py-2 flex-1 min-w-[140px]"
+                        >
+                            <option value="">Set Status...</option>
+                            <option value="Under Review">Under Review</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Resolved">Resolved</option>
+                        </select>
+                        <button
+                            onClick={handleBulkUpdate}
+                            disabled={isBulkUpdating || selectedReports.size === 0 || !bulkStatus}
+                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors"
+                        >
+                            {isBulkUpdating ? 'Updating...' : `Apply to ${selectedReports.size}`}
+                        </button>
+                        <button
+                            onClick={() => { setBulkMode(false); setSelectedReports(new Set()); }}
+                            className="text-slate-400 hover:text-white text-xs px-3 py-2 rounded-xl bg-slate-800 border border-slate-700"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </motion.div>
+            )}
 
             {/* Premium Vercel-Style Stats Overview */}
             <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10 -top-24">

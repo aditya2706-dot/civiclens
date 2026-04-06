@@ -19,10 +19,18 @@ const {
     transferReport,
     rejectResolution,
     addInternalNote,
-    assignReport
+    assignReport,
+    bulkUpdateStatus,
+    getSLASummary
 } = require('../controllers/reportController');
 const { protect, optionalAuth, admin, authority, adminOrAuthority } = require('../middlewares/authMiddleware');
 const { generateMonthlyPDF } = require('../controllers/pdfController');
+
+// Bulk update route — authority only
+router.route('/bulk-status').put(protect, adminOrAuthority, bulkUpdateStatus);
+
+// SLA breach summary — authority only
+router.route('/sla-summary').get(protect, adminOrAuthority, getSLASummary);
 
 // PDF Report Export — Authority/Admin only
 router.route('/monthly-pdf').get(protect, adminOrAuthority, generateMonthlyPDF);

@@ -2,6 +2,7 @@ const Report = require('../models/Report');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { analyzeImageGemini, getDepartmentForCategory, translateText } = require('../services/aiService');
+const { sendHighSeverityAlert, sendResolutionEmail } = require('../services/emailService');
 const axios = require('axios');
 const { getWardFromCoordinates } = require('../utils/wardDetector');
 
@@ -122,6 +123,11 @@ const submitReport = async (req, res) => {
         const report = await Report.create(reportData);
         // Invalidate cache so the new report appears immediately
         clearCache();
+
+        // 📧 Email alert for High Severity (fire-and-forget, non-blocking)
+        if (severity === 'High') {
+            sendHighSeverityAlert(report).catch(() => {});
+        }
 
         // Feature: Push Notifications for High Severity (Ward/Department Scope)
         if (severity === 'High') {
@@ -345,7 +351,6 @@ const updateReportStatus = async (req, res) => {
         const report = await Report.findById(req.params.id);
 
         if (report) {
-            // Verify OTP if attempting to resolve without a photo
             if (status === 'Resolved' && report.status !== 'Resolved') {
                 if (otp) {
                     if (report.resolutionOTP !== otp) {
@@ -356,12 +361,8 @@ const updateReportStatus = async (req, res) => {
                 }
             }
 
-            // Check if status is transitioning to Resolved
             if (status === 'Resolved' && report.status !== 'Resolved' && report.userId) {
-                // Award 50 points to the citizen who reported it
                 await User.findByIdAndUpdate(report.userId, { $inc: { civicPoints: 50 } });
-
-                // Feature: Target Citizen Notification
                 await Notification.create({
                     userId: report.userId,
                     reportId: report._id,
@@ -371,6 +372,18 @@ const updateReportStatus = async (req, res) => {
                 });
             }
 
+            // 🔒 RTI Audit Log — record every status transition
+            const prevStatus = report.status;
+            report.activityLog.push({
+                action: 'STATUS_CHANGED',
+                actor: req.user?.name || 'Authority',
+                actorId: req.user?._id || null,
+                from: prevStatus,
+                to: status,
+                note: otp ? 'Verified via Citizen OTP' : resolutionImageUrl ? 'Proof photo submitted' : '',
+                timestamp: new Date()
+            });
+
             report.status = status;
             if (status === 'Resolved' && !report.resolvedAt) {
                 report.resolvedAt = new Date();
@@ -378,7 +391,7 @@ const updateReportStatus = async (req, res) => {
             if (resolutionImageUrl) {
                 report.resolutionImageUrl = resolutionImageUrl;
             }
-            
+
             const updatedReport = await report.save();
             res.json(updatedReport);
         } else {
@@ -649,6 +662,69 @@ const getReportsStats = async (req, res) => {
     }
 }
 
+// @desc    Bulk update report statuses
+// @route   PUT /api/reports/bulk-status
+// @access  Authority/Admin
+const bulkUpdateStatus = async (req, res) => {
+    try {
+        const { reportIds, status } = req.body;
+        if (!reportIds || !Array.isArray(reportIds) || reportIds.length === 0) {
+            return res.status(400).json({ message: 'reportIds array is required' });
+        }
+        if (!status) return res.status(400).json({ message: 'status is required' });
+
+        const actorName = req.user?.name || 'Authority';
+        const actorId = req.user?._id || null;
+
+        const reports = await Report.find({ _id: { $in: reportIds } });
+        const now = new Date();
+
+        const updates = reports.map(report => {
+            report.activityLog.push({
+                action: 'BULK_STATUS_CHANGED',
+                actor: actorName,
+                actorId,
+                from: report.status,
+                to: status,
+                note: `Bulk update — ${reportIds.length} reports updated simultaneously`,
+                timestamp: now
+            });
+            report.status = status;
+            if (status === 'Resolved' && !report.resolvedAt) report.resolvedAt = now;
+            return report.save();
+        });
+
+        await Promise.all(updates);
+        clearCache();
+        res.json({ success: true, updated: updates.length, status });
+    } catch (error) {
+        res.status(500).json({ message: 'Bulk update failed', error: error.message });
+    }
+};
+
+// @desc    Get SLA breach summary for dashboard alert banner
+// @route   GET /api/reports/sla-summary
+// @access  Authority/Admin
+const getSLASummary = async (req, res) => {
+    try {
+        const now = new Date();
+        const [overdue, dueSoon, escalated] = await Promise.all([
+            Report.countDocuments({
+                status: { $nin: ['Resolved', 'Under Audit'] },
+                deadline: { $lt: now }
+            }),
+            Report.countDocuments({
+                status: { $nin: ['Resolved', 'Under Audit'] },
+                deadline: { $gte: now, $lt: new Date(now.getTime() + 6 * 60 * 60 * 1000) } // next 6h
+            }),
+            Report.countDocuments({ isEscalated: true, status: { $ne: 'Resolved' } })
+        ]);
+        res.json({ overdue, dueSoon, escalated });
+    } catch (err) {
+        res.status(500).json({ message: 'SLA summary failed', error: err.message });
+    }
+};
+
 module.exports = {
     analyzeImage,
     submitReport,
@@ -659,6 +735,8 @@ module.exports = {
     getReportsStats,
     getReportById,
     updateReportStatus,
+    bulkUpdateStatus,
+    getSLASummary,
     rejectResolution,
     transferReport,
     verifyReport,
