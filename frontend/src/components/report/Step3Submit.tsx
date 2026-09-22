@@ -24,6 +24,7 @@ export function Step3Submit({
     const [selectedCategory, setSelectedCategory] = useState(data.aiAnalysis?.suggestedCategory || "Other");
     const [description, setDescription] = useState(data.aiAnalysis?.summary || "");
     const [selectedWard, setSelectedWard] = useState(data.aiAnalysis?.suggestedWard || "");
+    const [reporterPhone, setReporterPhone] = useState("");
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
@@ -47,7 +48,8 @@ export function Step3Submit({
                 location: manualAddress ? { address: manualAddress } : (data.location || { lat: 0, lng: 0 }),
                 ward: data.ward || selectedWard,
                 nearbyLandmark: data.nearbyLandmark || '',
-                isAnonymous: isAnonymous
+                isAnonymous: isAnonymous,
+                reporterPhone: reporterPhone || null
             };
 
             if (!navigator.onLine) {
@@ -283,6 +285,23 @@ export function Step3Submit({
                     />
                     <p className="text-[10px] text-gray-400 mt-2 ml-1 italic">
                         * Tap the mic to speak in any language (Hindi, etc.). AI will translate it.
+                    </p>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100 flex flex-col gap-2">
+                    <label className="text-sm font-bold text-gray-700 flex items-center justify-between">
+                        Phone Number for SMS Updates
+                        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full uppercase tracking-tighter">Optional</span>
+                    </label>
+                    <input
+                        type="tel"
+                        value={reporterPhone}
+                        onChange={(e) => setReporterPhone(e.target.value)}
+                        placeholder="+91 98765 43210"
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 focus:ring-2 focus:ring-green-500 outline-none"
+                    />
+                    <p className="text-[10px] text-gray-400 ml-1">
+                        We'll send you a free SMS when your issue is marked In Progress or Resolved.
                     </p>
                 </div>
 

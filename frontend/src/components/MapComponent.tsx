@@ -38,7 +38,7 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
     const [selectedReport, setSelectedReport] = useState<any>(null);
     const [selectedReportDetails, setSelectedReportDetails] = useState<any>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
-    const [mapCenter, setMapCenter] = useState<[number, number]>([28.6139, 77.2090]); // Default to New Delhi
+    const [mapCenter, setMapCenter] = useState<[number, number]>([27.5700, 76.6033]); // Default to Alwar
     const [isHeatmapMode, setIsHeatmapMode] = useState(false);
     const router = useRouter();
 
@@ -148,8 +148,8 @@ export default function MapComponent({ selectedCategory, selectedWard }: { selec
                 <MapCenterUpdater center={mapCenter} />
 
                 <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
 
                 {isHeatmapMode ? (

@@ -6,6 +6,10 @@ const reportSchema = new mongoose.Schema({
         ref: 'User',
         required: false, // Allow anonymous reports
     },
+    reporterPhone: {
+        type: String,    // Optional phone number for SMSGate notifications
+        default: null,
+    },
     imageUrl: {
         type: String,
         required: true,
@@ -128,7 +132,24 @@ const reportSchema = new mongoose.Schema({
         to: { type: String },                           // New value
         note: { type: String },                         // Optional context
         timestamp: { type: Date, default: Date.now }
-    }]
+    }],
+    cleanAlwarSyncStatus: {
+        type: String,
+        enum: ['PENDING', 'SYNCED', 'FAILED'],
+        default: 'PENDING'
+    },
+    cleanAlwarReferenceId: {
+        type: String,
+        default: null
+    },
+    cleanAlwarSyncError: {
+        type: String,
+        default: null
+    },
+    lastSyncedAt: {
+        type: Date,
+        default: null
+    }
 }, { timestamps: true });
 
 // Performance Indexes for high-frequency queries and dashboard polling

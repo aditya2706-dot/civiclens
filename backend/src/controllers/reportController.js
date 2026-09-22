@@ -4,8 +4,11 @@ const Notification = require('../models/Notification');
 const { analyzeImageGemini, getDepartmentForCategory, translateText } = require('../services/aiService');
 const { sendHighSeverityPush, sendNewReportPush } = require('../services/pushService');
 const { sendHighSeverityAlert } = require('../services/emailService');
+const { sendReportStatusSMS } = require('../services/smsService');
+
 const axios = require('axios');
 const { getWardFromCoordinates } = require('../utils/wardDetector');
+const { syncReportToCleanAlwar } = require('../services/cleanAlwarBridge');
 
 // Simple in-memory cache to reduce repeated DB queries
 const _cache = {};
@@ -53,9 +56,9 @@ const analyzeImage = async (req, res) => {
 // @desc    Submit a new report
 // @route   POST /api/reports
 // @access  Public (can be anonymous or authenticated)
-const submitReport = async (req, res) => {
+    const submitReport = async (req, res) => {
     try {
-        const { imageUrl, location, description, isAnonymous, category, aiSummary, detectedObjects, severity, department, ward } = req.body;
+        const { imageUrl, location, description, isAnonymous, category, aiSummary, detectedObjects, severity, department, ward, reporterPhone } = req.body;
 
         // SLA Deadlines: High=24h, Medium=48h, Low=72h
         let hoursToAdd = 48;
@@ -113,6 +116,7 @@ const submitReport = async (req, res) => {
             estimatedCost: req.body.estimatedCost || 0,
             estimatedResources: req.body.estimatedResources || "Unknown",
             isDuplicateOf: duplicateOf,
+            reporterPhone: reporterPhone || null,
         };
 
         if (!isAnonymous && req.user) {
@@ -124,6 +128,11 @@ const submitReport = async (req, res) => {
         const report = await Report.create(reportData);
         // Invalidate cache so the new report appears immediately
         clearCache();
+
+        // 🌉 Clean Alwar Portal Sync (fire-and-forget)
+        syncReportToCleanAlwar(report).catch(err => {
+            console.error('CleanAlwar Sync Trigger Error:', err);
+        });
 
         // 🔔 Push + 📧 Email alerts for High Severity (fire-and-forget, non-blocking)
         if (severity === 'High') {
@@ -240,7 +249,7 @@ const getAuthorityReports = async (req, res) => {
             return res.json(cached);
         }
 
-        let query = { isDuplicateOf: { $in: [null, undefined] } };
+        let query = {}; // Temporarily disabled duplicate hiding so testers can see all reports
 
         if (req.user.role !== 'admin') {
             const orClauses = [];
@@ -392,6 +401,11 @@ const updateReportStatus = async (req, res) => {
             }
             if (resolutionImageUrl) {
                 report.resolutionImageUrl = resolutionImageUrl;
+            }
+
+            // 📱 Send SMS Notification to Citizen (fire-and-forget) via Android SMS Gateway
+            if (report.reporterPhone && prevStatus !== status) {
+                sendReportStatusSMS(report.reporterPhone, report.category, status, report._id);
             }
 
             const updatedReport = await report.save();
@@ -682,17 +696,24 @@ const bulkUpdateStatus = async (req, res) => {
         const now = new Date();
 
         const updates = reports.map(report => {
+            const prevStatus = report.status;
             report.activityLog.push({
                 action: 'BULK_STATUS_CHANGED',
                 actor: actorName,
                 actorId,
-                from: report.status,
+                from: prevStatus,
                 to: status,
                 note: `Bulk update — ${reportIds.length} reports updated simultaneously`,
                 timestamp: now
             });
             report.status = status;
             if (status === 'Resolved' && !report.resolvedAt) report.resolvedAt = now;
+
+            // 📱 Send SMS Notification via SMSGate
+            if (report.reporterPhone && prevStatus !== status) {
+                sendReportStatusSMS(report.reporterPhone, report.category, status, report._id);
+            }
+
             return report.save();
         });
 
