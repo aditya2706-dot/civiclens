@@ -6,7 +6,7 @@
   "theme_color": "#16a34a",
   "background_color": "#f8fafc",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
+  "display_override": ["window-controls-overlay", "tabbed", "standalone"],
   "orientation": "portrait",
   "scope": "/",
   "start_url": "/",
@@ -15,7 +15,28 @@
   "categories": ["civic", "social", "utilities"],
   "iarc_rating_id": "e84b0728-360d-410a-85d7-fc00dbb29846",
   "prefer_related_applications": false,
-  "related_applications": [],
+  "related_applications": [{"platform": "webapp", "url": "https://civiclens.vercel.app/manifest.json"}],
+  "scope_extensions": [{"origin": "*.civiclens.app"}],
+  "edge_side_panel": {"preferred_width": 400},
+  "launch_handler": {"client_mode": "navigate-existing"},
+  "protocol_handlers": [{"protocol": "web+civiclens", "url": "/report?url=%s"}],
+  "share_target": {
+    "action": "/report",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "/report",
+      "accept": {
+        "image/*": [".png", ".jpg", ".jpeg"]
+      }
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192x192.png",
