@@ -3,7 +3,7 @@ import withPWAInit from "@ducanh2912/next-pwa";
 
 const withPWA = withPWAInit({
   dest: "public",
-  disable: true, // Temporarily disable to bypass persistent cache issues
+  disable: process.env.NODE_ENV === "development", // Disable in dev to bypass persistent cache issues, but enable in prod
   register: true,
 });
 

@@ -60,6 +60,31 @@ const analyzeImage = async (req, res) => {
     try {
         const { imageUrl, location, description, isAnonymous, category, aiSummary, detectedObjects, severity, department, ward, reporterPhone } = req.body;
 
+        // 🛡️ Server-Side AI Verification (Spam Prevention)
+        // Ensure malicious users can't bypass frontend and submit fake reports
+        if (imageUrl && imageUrl.startsWith('data:image')) {
+            try {
+                const base64Data = imageUrl.split(',')[1] || imageUrl;
+                const mimeMatch = imageUrl.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/);
+                const mimeType = mimeMatch && mimeMatch.length ? mimeMatch[1] : 'image/jpeg';
+                
+                const aiAnalysis = await analyzeImageGemini(base64Data, mimeType, '', ward, location);
+                
+                if (aiAnalysis.isGenuine === false) {
+                    return res.status(400).json({ 
+                        message: 'Spam Prevention: Image Validation Failed', 
+                        fraudReason: aiAnalysis.fraudReason || 'Image does not appear to show a valid civic issue.'
+                    });
+                }
+            } catch (aiError) {
+                console.error('Server-side AI validation failed:', aiError);
+                return res.status(500).json({ message: 'Error verifying image via AI', error: aiError.message });
+            }
+        } else if (imageUrl && !imageUrl.startsWith('http')) {
+            // Reject if it's neither a data URL nor a valid http URL
+            return res.status(400).json({ message: 'Invalid image format provided.' });
+        }
+
         // SLA Deadlines: High=24h, Medium=48h, Low=72h
         let hoursToAdd = 48;
         if (severity === 'High') hoursToAdd = 24;
